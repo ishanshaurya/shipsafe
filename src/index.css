@@ -1,0 +1,88 @@
+/* Tailwind v4 — single import, no config file needed */
+@import "tailwindcss";
+
+/* ─── ShipSafe Custom Theme ─────────────────────────────── */
+/* These CSS variables define our entire color system.
+   Every component uses these instead of hardcoded colors.
+   This means we could add a light mode later by just 
+   swapping these values. */
+
+:root {
+  /* Backgrounds */
+  --bg-primary: #070b12;
+  --bg-card: #0f1623;
+  --bg-input: #070b12;
+  --bg-hover: #111827;
+
+  /* Borders */
+  --border-default: #1a2540;
+  --border-hover: #253352;
+  --border-active: #38bdf8;
+
+  /* Text */
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted: #475569;
+  --text-dimmed: #334155;
+
+  /* Brand colors */
+  --accent: #0ea5e9;
+  --accent-light: #38bdf8;
+  --accent-glow: rgba(14, 165, 233, 0.15);
+
+  /* Status colors */
+  --green: #22c55e;
+  --yellow: #f59e0b;
+  --orange: #f97316;
+  --red: #ef4444;
+  --purple: #a855f7;
+  --blue: #3b82f6;
+
+  /* Fonts */
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --font-display: 'Syne', sans-serif;
+}
+
+/* ─── Base Styles ────────────────────────────────────────── */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-mono);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ─── Scrollbar (subtle, matches theme) ──────────────────── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: var(--bg-primary); }
+::-webkit-scrollbar-thumb { background: var(--border-default); border-radius: 2px; }
+
+/* ─── Animations ─────────────────────────────────────────── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideIn {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.animate-fade-in { animation: fadeIn 0.3s ease; }
+.animate-slide-in { animation: slideIn 0.25s ease; }
+.animate-pulse-slow { animation: pulse 2s infinite; }
+
+/* ─── Google Fonts (loaded async) ────────────────────────── */
+/* We import these here so they're available everywhere */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=Syne:wght@700;800&display=swap');
