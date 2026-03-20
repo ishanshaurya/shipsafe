@@ -1,14 +1,15 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Link } from "react-router-dom"
-import { LayoutDashboard, Bug, Search, Scale, KeyRound, Rocket, FlaskConical, ArrowRight, Clock, Shield, Zap, TrendingUp, Activity } from "lucide-react"
+import { LayoutDashboard, Bug, Search, Scale, KeyRound, Rocket, FlaskConical, Clock, Shield, Zap, TrendingUp, Activity } from "lucide-react"
+import { supabase } from "../lib/supabase"
+import { useAuth } from "../hooks/useAuth"
 
 /* ═══════════════════════════════════════════════════════════
    DASHBOARD — ShipSafe Home
 
-   Shows: quick stats, recent scan history (mock for now),
-   quick action cards to each tool, and a pipeline overview.
-   When auth + Supabase saving is added, this will show
-   real user-specific scan history.
+   Shows: quick stats, recent scan history, quick action cards,
+   and a pipeline overview. When logged in, fetches real scan
+   history from Supabase. Falls back to MOCK_SCANS when not.
    ═══════════════════════════════════════════════════════════ */
 
 const TOOLS = [
@@ -20,7 +21,6 @@ const TOOLS = [
   { name: "Stress Test", desc: "Simulate concurrent users", icon: FlaskConical, color: "#eab308", path: "/stress-test" },
 ]
 
-// Mock recent scans (will be replaced with Supabase data when auth is added)
 const MOCK_SCANS = [
   { id: 1, type: "debugger", title: "Express.js REST API", score: 22, issues: 9, time: "2 hours ago", color: "#ef4444" },
   { id: 2, type: "audit", title: "my-ai-app project", score: 35, issues: 17, time: "3 hours ago", color: "#f97316" },
@@ -29,13 +29,82 @@ const MOCK_SCANS = [
   { id: 5, type: "stress-test", title: "Vercel free tier stack", score: null, issues: 3, time: "1 day ago", color: "#eab308" },
 ]
 
+const SCAN_COLORS = {
+  debugger: "#ef4444",
+  audit: "#f97316",
+  loopholes: "#a855f7",
+  "deploy-check": "#22c55e",
+  "stress-test": "#eab308",
+}
+
 const PIPELINE_STEPS = [
   { num: "01", label: "CODE", question: "Is my code safe?", color: "#0ea5e9", tools: ["Debugger", "Audit"] },
   { num: "02", label: "LEGAL", question: "Is my project legal?", color: "#f59e0b", tools: ["Regulations", "Loopholes"] },
   { num: "03", label: "DEPLOY", question: "Am I ready to ship?", color: "#22c55e", tools: ["Deploy Check", "Stress Test"] },
 ]
 
+function timeAgo(ts) {
+  const diff = Math.floor((Date.now() - new Date(ts)) / 1000)
+  if (diff < 60) return "just now"
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
+  return `${Math.floor(diff / 86400)}d ago`
+}
+
+function issueCount(result, scanType) {
+  if (!result) return 0
+  if (scanType === "debugger") return result.stats?.totalIssues ?? 0
+  if (scanType === "audit") return result.issues?.length ?? 0
+  if (scanType === "loopholes") return result.greyAreas?.length ?? 0
+  if (scanType === "deploy-check") return result.checks?.filter(c => c.status === "fail" || c.status === "warn").length ?? 0
+  if (scanType === "stress-test") return result.tiers?.filter(t => t.status === "red").length ?? 0
+  return 0
+}
+
+function mapDbScan(row) {
+  return {
+    id: row.id,
+    type: row.scan_type,
+    title: row.input_snippet?.slice(0, 40).replace(/\n/g, " ").trim() || row.scan_type,
+    score: row.score,
+    issues: issueCount(row.result, row.scan_type),
+    time: timeAgo(row.created_at),
+    color: SCAN_COLORS[row.scan_type] ?? "#38bdf8",
+  }
+}
+
 export default function Dashboard() {
+  const { user } = useAuth()
+  const [scans, setScans] = useState(null)   // null = not yet loaded
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!user) { setScans(null); return }
+    setLoading(true)
+    supabase
+      .from("scan_history")
+      .select("id, scan_type, input_snippet, result, score, created_at")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(10)
+      .then(({ data }) => {
+        setScans(data ? data.map(mapDbScan) : [])
+        setLoading(false)
+      })
+  }, [user])
+
+  const displayScans = scans ?? MOCK_SCANS
+  const isReal = !!scans
+
+  // Stats derived from whichever dataset is active
+  const totalScans = displayScans.length
+  const issuesFound = displayScans.reduce((sum, s) => sum + (s.issues ?? 0), 0)
+  const scoredScans = displayScans.filter(s => s.score !== null)
+  const avgScore = scoredScans.length
+    ? Math.round(scoredScans.reduce((sum, s) => sum + s.score, 0) / scoredScans.length)
+    : 0
+  const toolsUsed = new Set(displayScans.map(s => s.type)).size
+
   return (
     <div className="animate-fade-in">
       {/* Header */}
@@ -46,7 +115,9 @@ export default function Dashboard() {
           </div>
           <div>
             <h1 style={{ fontSize: 22, fontWeight: 800, color: "#f1f5f9" }}>Dashboard</h1>
-            <p style={{ fontSize: 11, color: "#475569" }}>Welcome back. Here's your ShipSafe overview.</p>
+            <p style={{ fontSize: 11, color: "#475569" }}>
+              {user ? `Welcome back, ${user.email}` : "Welcome back. Here's your ShipSafe overview."}
+            </p>
           </div>
         </div>
       </div>
@@ -54,10 +125,10 @@ export default function Dashboard() {
       {/* Stats row */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
         {[
-          { label: "Total Scans", value: "5", icon: Activity, color: "#38bdf8" },
-          { label: "Issues Found", value: "39", icon: Bug, color: "#ef4444" },
-          { label: "Avg Score", value: "43", icon: TrendingUp, color: "#f59e0b" },
-          { label: "Tools Used", value: "5/6", icon: Zap, color: "#22c55e" },
+          { label: "Total Scans", value: String(totalScans), icon: Activity, color: "#38bdf8" },
+          { label: "Issues Found", value: String(issuesFound), icon: Bug, color: "#ef4444" },
+          { label: "Avg Score", value: scoredScans.length ? String(avgScore) : "—", icon: TrendingUp, color: "#f59e0b" },
+          { label: "Tools Used", value: `${toolsUsed}/6`, icon: Zap, color: "#22c55e" },
         ].map((stat, i) => (
           <div key={i} style={{
             background: "rgba(15,22,40,0.6)", border: "1px solid rgba(56,189,248,0.08)",
@@ -103,34 +174,54 @@ export default function Dashboard() {
         <div style={{ background: "rgba(15,22,40,0.6)", border: "1px solid rgba(56,189,248,0.08)", borderRadius: 14, padding: "20px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
             <span style={{ fontSize: 11, color: "#475569", letterSpacing: "0.1em" }}>RECENT SCANS</span>
-            <span style={{ fontSize: 10, color: "#334155" }}>Demo data</span>
+            <span style={{ fontSize: 10, color: isReal ? "#34d399" : "#334155" }}>
+              {isReal ? "Live data" : "Demo data"}
+            </span>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {MOCK_SCANS.map((scan) => (
-              <div key={scan.id} style={{
-                display: "flex", alignItems: "center", gap: 12,
-                padding: "10px 12px", borderRadius: 8,
-                background: "rgba(8,12,22,0.4)", border: "1px solid rgba(26,37,64,0.4)",
-              }}>
-                <div style={{ width: 8, height: 8, borderRadius: "50%", background: scan.color, flexShrink: 0 }} />
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 12, color: "#e2e8f0", fontWeight: 500 }}>{scan.title}</div>
-                  <div style={{ fontSize: 10, color: "#475569" }}>{scan.type} • {scan.issues} issues</div>
-                </div>
-                {scan.score !== null && (
-                  <div style={{ fontSize: 14, fontWeight: 700, color: scan.score >= 60 ? "#22c55e" : scan.score >= 40 ? "#f59e0b" : "#ef4444" }}>
-                    {scan.score}
+
+          {loading && (
+            <div style={{ textAlign: "center", padding: "40px 0", fontSize: 12, color: "#475569" }}>
+              Loading...
+            </div>
+          )}
+
+          {!loading && displayScans.length === 0 && (
+            <div style={{ textAlign: "center", padding: "40px 0", fontSize: 12, color: "#475569" }}>
+              No scans yet — run a tool to get started.
+            </div>
+          )}
+
+          {!loading && displayScans.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {displayScans.map((scan) => (
+                <div key={scan.id} style={{
+                  display: "flex", alignItems: "center", gap: 12,
+                  padding: "10px 12px", borderRadius: 8,
+                  background: "rgba(8,12,22,0.4)", border: "1px solid rgba(26,37,64,0.4)",
+                }}>
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: scan.color, flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12, color: "#e2e8f0", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{scan.title}</div>
+                    <div style={{ fontSize: 10, color: "#475569" }}>{scan.type} • {scan.issues} issues</div>
                   </div>
-                )}
-                <div style={{ fontSize: 10, color: "#334155", display: "flex", alignItems: "center", gap: 4 }}>
-                  <Clock size={10} /> {scan.time}
+                  {scan.score !== null && (
+                    <div style={{ fontSize: 14, fontWeight: 700, color: scan.score >= 60 ? "#22c55e" : scan.score >= 40 ? "#f59e0b" : "#ef4444", flexShrink: 0 }}>
+                      {scan.score}
+                    </div>
+                  )}
+                  <div style={{ fontSize: 10, color: "#334155", display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+                    <Clock size={10} /> {scan.time}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-          <div style={{ textAlign: "center", marginTop: 12, fontSize: 11, color: "#334155" }}>
-            Sign in to save and track your scan history
-          </div>
+              ))}
+            </div>
+          )}
+
+          {!isReal && (
+            <div style={{ textAlign: "center", marginTop: 12, fontSize: 11, color: "#334155" }}>
+              Sign in to save and track your scan history
+            </div>
+          )}
         </div>
       </div>
 
