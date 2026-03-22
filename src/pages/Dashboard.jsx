@@ -3,6 +3,7 @@ import { Link } from "react-router-dom"
 import { LayoutDashboard, Bug, Search, Scale, KeyRound, Rocket, FlaskConical, Clock, Shield, Zap, TrendingUp, Activity } from "lucide-react"
 import { supabase } from "../lib/supabase"
 import { useAuth } from "../hooks/useAuth"
+import { MOCK_SCANS, SCAN_COLORS } from "../data/mockResults"
 
 /* ═══════════════════════════════════════════════════════════
    DASHBOARD — ShipSafe Home
@@ -20,22 +21,6 @@ const TOOLS = [
   { name: "Deploy Check", desc: "Validate deployment config", icon: Rocket, color: "#22c55e", path: "/deploy-check" },
   { name: "Stress Test", desc: "Simulate concurrent users", icon: FlaskConical, color: "#eab308", path: "/stress-test" },
 ]
-
-const MOCK_SCANS = [
-  { id: 1, type: "debugger", title: "Express.js REST API", score: 22, issues: 9, time: "2 hours ago", color: "#ef4444" },
-  { id: 2, type: "audit", title: "my-ai-app project", score: 35, issues: 17, time: "3 hours ago", color: "#f97316" },
-  { id: 3, type: "loopholes", title: "Facial Recognition System", score: 72, issues: 4, time: "5 hours ago", color: "#a855f7" },
-  { id: 4, type: "deploy-check", title: "Vercel + Supabase config", score: 45, issues: 6, time: "1 day ago", color: "#22c55e" },
-  { id: 5, type: "stress-test", title: "Vercel free tier stack", score: null, issues: 3, time: "1 day ago", color: "#eab308" },
-]
-
-const SCAN_COLORS = {
-  debugger: "#ef4444",
-  audit: "#f97316",
-  loopholes: "#a855f7",
-  "deploy-check": "#22c55e",
-  "stress-test": "#eab308",
-}
 
 const PIPELINE_STEPS = [
   { num: "01", label: "CODE", question: "Is my code safe?", color: "#0ea5e9", tools: ["Debugger", "Audit"] },
@@ -77,20 +62,40 @@ export default function Dashboard() {
   const { user } = useAuth()
   const [scans, setScans] = useState(null)   // null = not yet loaded
   const [loading, setLoading] = useState(false)
+  const [fetchError, setFetchError] = useState(null)
 
   useEffect(() => {
     if (!user) { setScans(null); return }
     setLoading(true)
-    supabase
-      .from("scan_history")
-      .select("id, scan_type, input_snippet, result, score, created_at")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(10)
-      .then(({ data }) => {
-        setScans(data ? data.map(mapDbScan) : [])
+    setFetchError(null)
+
+    // ✅ TASK 2: Wrapped Supabase fetch in try/catch + error check
+    const fetchScans = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("scan_history")
+          .select("id, scan_type, input_snippet, result, score, created_at")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(10)
+
+        if (error) {
+          console.error("Failed to fetch scans:", error.message)
+          setFetchError("Couldn't load scan history")
+          setScans([])
+        } else {
+          setScans(data ? data.map(mapDbScan) : [])
+        }
+      } catch (err) {
+        console.error("Supabase fetch error:", err)
+        setFetchError("Couldn't connect to database")
+        setScans([])
+      } finally {
         setLoading(false)
-      })
+      }
+    }
+
+    fetchScans()
   }, [user])
 
   const displayScans = scans ?? MOCK_SCANS
@@ -178,6 +183,13 @@ export default function Dashboard() {
               {isReal ? "Live data" : "Demo data"}
             </span>
           </div>
+
+          {/* ✅ TASK 2: Error toast for failed Supabase fetch */}
+          {fetchError && (
+            <div style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 8, padding: "10px 14px", marginBottom: 10, fontSize: 11, color: "#ef4444" }}>
+              {fetchError}
+            </div>
+          )}
 
           {loading && (
             <div style={{ textAlign: "center", padding: "40px 0", fontSize: 12, color: "#475569" }}>
