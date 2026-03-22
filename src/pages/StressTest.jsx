@@ -117,13 +117,18 @@ export default function StressTest() {
     const stressResult = getMockStressTest(stack)
     setResult(stressResult)
     if (user) {
-      supabase.from("scan_history").insert({
-        user_id: user.id,
-        scan_type: "stress-test",
-        input_snippet: stack.slice(0, 500),
-        result: stressResult,
-        score: null,
-      })
+      try {
+        const { error: dbError } = await supabase.from("scan_history").insert({
+          user_id: user.id,
+          scan_type: "stress-test",
+          input_snippet: stack.slice(0, 500),
+          result: stressResult,
+          score: null,
+        })
+        if (dbError) console.error("Failed to save scan:", dbError.message)
+      } catch (err) {
+        console.error("Supabase save error:", err)
+      }
     }
     setLoading(false)
   }

@@ -243,13 +243,18 @@ export default function Audit() {
     const audit = getMockAudit(code)
     setResult(audit)
     if (user) {
-      supabase.from("scan_history").insert({
-        user_id: user.id,
-        scan_type: "audit",
-        input_snippet: code.slice(0, 500),
-        result: audit,
-        score: audit.overallScore,
-      })
+      try {
+        const { error: dbError } = await supabase.from("scan_history").insert({
+          user_id: user.id,
+          scan_type: "audit",
+          input_snippet: code.slice(0, 500),
+          result: audit,
+          score: audit.overallScore,
+        })
+        if (dbError) console.error("Failed to save scan:", dbError.message)
+      } catch (err) {
+        console.error("Supabase save error:", err)
+      }
     }
     const ae = {}
     audit.issues.forEach(i => { if (i.severity === "critical" || i.severity === "high") ae[i.id] = true })

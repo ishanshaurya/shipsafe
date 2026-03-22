@@ -198,13 +198,18 @@ export default function Loopholes() {
     const analysis = getMockAnalysis(description, selected)
     setResult(analysis)
     if (user) {
-      supabase.from("scan_history").insert({
-        user_id: user.id,
-        scan_type: "loopholes",
-        input_snippet: description.slice(0, 500),
-        result: analysis,
-        score: analysis.riskScore,
-      })
+      try {
+        const { error: dbError } = await supabase.from("scan_history").insert({
+          user_id: user.id,
+          scan_type: "loopholes",
+          input_snippet: description.slice(0, 500),
+          result: analysis,
+          score: analysis.riskScore,
+        })
+        if (dbError) console.error("Failed to save scan:", dbError.message)
+      } catch (err) {
+        console.error("Supabase save error:", err)
+      }
     }
     const ae = {}
     analysis.greyAreas.forEach((g) => { if (g.risk === "high") ae[g.id] = true })

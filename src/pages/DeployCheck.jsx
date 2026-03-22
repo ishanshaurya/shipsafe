@@ -138,13 +138,18 @@ export default function DeployCheck() {
     const res = getMockDeployCheck(config, platform)
     setResult(res)
     if (user) {
-      supabase.from("scan_history").insert({
-        user_id: user.id,
-        scan_type: "deploy-check",
-        input_snippet: config.slice(0, 500),
-        result: res,
-        score: res.score,
-      })
+      try {
+        const { error: dbError } = await supabase.from("scan_history").insert({
+          user_id: user.id,
+          scan_type: "deploy-check",
+          input_snippet: config.slice(0, 500),
+          result: res,
+          score: res.score,
+        })
+        if (dbError) console.error("Failed to save scan:", dbError.message)
+      } catch (err) {
+        console.error("Supabase save error:", err)
+      }
     }
     const ae = {}
     res.checks.forEach(c => { if (c.status === "fail") ae[c.id] = true })
