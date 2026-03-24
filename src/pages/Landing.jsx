@@ -6,7 +6,6 @@ import {
   Zap, Clock, AlertTriangle, Check, X, Code, Globe,
   Users, Lock, Terminal, FileWarning, Gauge
 } from 'lucide-react'
-import { useIsMobile } from '../hooks/useIsMobile'
 
 /* ═══════════════════════════════════════════════════════════
    SHIPSAFE LANDING PAGE
@@ -305,8 +304,6 @@ function FAQ() {
 // MAIN LANDING PAGE
 // ═══════════════════════════════════════════════════════════
 export default function Landing() {
-  const isMobile = useIsMobile()
-  const sp = isMobile ? '40px 20px' : '80px 48px'  // section padding shorthand
   return (
     <div style={{
       fontFamily: "'DM Sans', sans-serif",
@@ -322,7 +319,7 @@ export default function Landing() {
 
       {/* ═══ NAVBAR ═══ */}
       <nav style={{
-        padding: isMobile ? '0 16px' : '0 48px',
+        padding: '0 48px',
         height: 64,
         display: 'flex',
         alignItems: 'center',
@@ -333,71 +330,85 @@ export default function Landing() {
         backdropFilter: 'blur(16px)',
         zIndex: 100,
         borderBottom: '1px solid rgba(56, 189, 248, 0.06)',
-        gap: 12,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{
-            width: 34, height: 34,
+            width: 34,
+            height: 34,
             background: 'linear-gradient(135deg, #34d399, #06b6d4)',
             borderRadius: 10,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
             fontSize: 16,
           }}>🛡</div>
           <span style={{
             fontFamily: "'Plus Jakarta Sans', sans-serif",
-            fontSize: 20, fontWeight: 800, color: '#f1f5f9', letterSpacing: '-0.02em',
+            fontSize: 20,
+            fontWeight: 800,
+            color: '#f1f5f9',
+            letterSpacing: '-0.02em',
           }}>ShipSafe</span>
         </div>
 
-        {!isMobile && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 32 }}>
-            {['Features', 'How it Works', 'Tools', 'FAQ'].map(item => (
-              <a key={item} href={`#${item.toLowerCase().replace(/\s/g, '-')}`} style={{
-                fontSize: 14, color: '#64748b', textDecoration: 'none', fontWeight: 500, transition: 'color 0.2s',
-              }}
-                onMouseEnter={e => e.target.style.color = '#e2e8f0'}
-                onMouseLeave={e => e.target.style.color = '#64748b'}
-              >{item}</a>
-            ))}
-          </div>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 32 }}>
+          {['Features', 'How it Works', 'Tools', 'FAQ'].map(item => (
+            <a key={item} href={`#${item.toLowerCase().replace(/\s/g, '-')}`} style={{
+              fontSize: 14,
+              color: '#64748b',
+              textDecoration: 'none',
+              fontWeight: 500,
+              transition: 'color 0.2s',
+            }}
+              onMouseEnter={e => e.target.style.color = '#e2e8f0'}
+              onMouseLeave={e => e.target.style.color = '#64748b'}
+            >{item}</a>
+          ))}
+        </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <Link to="/login" style={{
-            fontSize: 13, color: '#34d399', textDecoration: 'none', fontWeight: 600,
-            padding: '8px 14px', borderRadius: 8, border: '1px solid rgba(52, 211, 153, 0.25)',
+            fontSize: 14,
+            color: '#34d399',
+            textDecoration: 'none',
+            fontWeight: 600,
+            padding: '8px 20px',
+            borderRadius: 8,
+            border: '1px solid rgba(52, 211, 153, 0.25)',
+            transition: 'all 0.2s',
           }}>Log in</Link>
-          {!isMobile && (
-            <Link to="/dashboard" style={{ ...mintBtn, padding: '10px 24px', fontSize: 13 }}>
-              Get started for free
-            </Link>
-          )}
+          <Link to="/dashboard" style={{
+            ...mintBtn,
+            padding: '10px 24px',
+            fontSize: 13,
+          }}>Get started for free</Link>
         </div>
       </nav>
 
       {/* ═══ HERO SECTION ═══ */}
       <section style={{
         position: 'relative',
-        padding: isMobile ? '40px 16px' : '100px 48px 80px',
+        padding: '100px 48px 80px',
         textAlign: 'center',
       }}>
         <ArcBackground />
 
+        {/* Outer glass container — like Puzzle's main container */}
         <div style={{
           ...glassCard,
           maxWidth: 1100,
           margin: '0 auto',
-          padding: isMobile ? '32px 20px' : '80px 60px 60px',
+          padding: '80px 60px 60px',
           position: 'relative',
           zIndex: 1,
         }}>
           <h1 style={{
             fontFamily: "'Plus Jakarta Sans', sans-serif",
-            fontSize: isMobile ? 32 : 58,
+            fontSize: 58,
             fontWeight: 800,
-            lineHeight: 1.15,
+            lineHeight: 1.1,
             color: '#f1f5f9',
-            marginBottom: 16,
+            marginBottom: 20,
             letterSpacing: '-0.03em',
           }}>
             AI Developer Toolkit That
@@ -406,31 +417,30 @@ export default function Landing() {
           </h1>
 
           <p style={{
-            fontSize: isMobile ? 14 : 17,
+            fontSize: 17,
             color: '#64748b',
             lineHeight: 1.7,
             maxWidth: 560,
-            margin: '0 auto 12px',
+            margin: '0 auto 16px',
           }}>
             Built for the vibe-coding era. Debug AI-generated code, check global
             regulation compliance, and validate deployment — all in one place.
           </p>
 
-          <p style={{ fontSize: 13, color: '#94a3b8', marginBottom: isMobile ? 24 : 40 }}>
+          <p style={{
+            fontSize: 14,
+            color: '#94a3b8',
+            marginBottom: 40,
+          }}>
             Built with <span style={{ color: '#34d399' }}>Claude AI</span> · 100% Free
           </p>
 
-          {isMobile && (
-            <Link to="/dashboard" style={{ ...mintBtn, marginBottom: 24, justifyContent: 'center' }}>
-              Get started for free
-            </Link>
-          )}
-
+          {/* Feature preview cards — 4 columns like Puzzle's bottom cards */}
           <div style={{
             display: 'grid',
-            gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)',
-            gap: isMobile ? 10 : 14,
-            marginTop: isMobile ? 0 : 40,
+            gridTemplateColumns: 'repeat(4, 1fr)',
+            gap: 14,
+            marginTop: 40,
           }}>
             {[
               { icon: Bug, title: 'AI Debugger', desc: 'Find bugs & vibe-code smells', color: '#ef4444', preview: <MiniCodePreview /> },
@@ -472,24 +482,30 @@ export default function Landing() {
       </section>
 
       {/* ═══ USER TYPE SECTION — "I'm a Developer" / "I'm a Founder" ═══ */}
-      <section style={{ position: 'relative', padding: sp }}>
+      <section style={{
+        position: 'relative',
+        padding: '80px 48px',
+      }}>
         <ArcBackground />
         <div style={{
           ...glassCard,
           maxWidth: 1100,
           margin: '0 auto',
-          padding: isMobile ? '28px 20px' : '60px',
+          padding: '60px',
           position: 'relative',
           zIndex: 1,
         }}>
-          {!isMobile && (
-            <div style={{
-              position: 'absolute', left: '50%', top: 40, bottom: 40,
-              width: 1, borderLeft: '1px dashed rgba(148,163,184,0.2)',
-            }} />
-          )}
+          {/* Vertical dashed connector */}
+          <div style={{
+            position: 'absolute',
+            left: '50%',
+            top: 40,
+            bottom: 40,
+            width: 1,
+            borderLeft: '1px dashed rgba(148,163,184,0.2)',
+          }} />
 
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: isMobile ? 32 : 80 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 80 }}>
             {/* Developer */}
             <div style={{ textAlign: 'left' }}>
               <div style={{
@@ -557,28 +573,31 @@ export default function Landing() {
       </section>
 
       {/* ═══ COMPARISON SECTION — "With ShipSafe vs Without" ═══ */}
-      <section id="how-it-works" style={{ position: 'relative', padding: sp }}>
+      <section id="how-it-works" style={{
+        position: 'relative',
+        padding: '80px 48px',
+      }}>
         <ArcBackground />
         <div style={{
           ...glassCard,
           maxWidth: 1100,
           margin: '0 auto',
-          padding: isMobile ? '28px 20px' : '60px',
+          padding: '60px',
           position: 'relative',
           zIndex: 1,
         }}>
           <h2 style={{
             fontFamily: "'Plus Jakarta Sans', sans-serif",
-            fontSize: isMobile ? 24 : 36,
+            fontSize: 36,
             fontWeight: 800,
             color: '#f1f5f9',
             textAlign: 'center',
-            marginBottom: isMobile ? 28 : 48,
+            marginBottom: 48,
           }}>
             Results In <span style={{ color: '#34d399', textDecoration: 'underline', textUnderlineOffset: 6, textDecorationColor: 'rgba(52,211,153,0.3)' }}>5 Minutes</span>, Not 5 Sprints
           </h2>
 
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: isMobile ? 28 : 40 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 40 }}>
             {/* With ShipSafe */}
             <div>
               <h4 style={{ fontSize: 18, fontWeight: 700, color: '#34d399', marginBottom: 6, textAlign: 'center' }}>With ShipSafe</h4>
@@ -677,23 +696,23 @@ export default function Landing() {
       </section>
 
       {/* ═══ PIPELINE SECTION ═══ */}
-      <section id="features" style={{ padding: sp, position: 'relative' }}>
-        <div style={{ textAlign: 'center', marginBottom: isMobile ? 24 : 48, position: 'relative', zIndex: 1 }}>
+      <section id="features" style={{ padding: '80px 48px', position: 'relative' }}>
+        <div style={{ textAlign: 'center', marginBottom: 48, position: 'relative', zIndex: 1 }}>
           <h2 style={{
             fontFamily: "'Plus Jakarta Sans', sans-serif",
-            fontSize: isMobile ? 24 : 36,
+            fontSize: 36,
             fontWeight: 800,
             color: '#f1f5f9',
             marginBottom: 8,
           }}>
             Three Stages. One Pipeline.
           </h2>
-          <p style={{ fontSize: isMobile ? 13 : 15, color: '#64748b' }}>
+          <p style={{ fontSize: 15, color: '#64748b' }}>
             Every tool answers one of three questions on your way to production.
           </p>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: 20, maxWidth: 1000, margin: '0 auto', position: 'relative', zIndex: 1 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 20, maxWidth: 1000, margin: '0 auto', position: 'relative', zIndex: 1 }}>
           {[
             {
               num: '01', label: 'CODE', question: 'Is my code safe?', color: '#0ea5e9',
@@ -766,7 +785,10 @@ export default function Landing() {
       </section>
 
       {/* ═══ CTA SECTION ═══ */}
-      <section style={{ position: 'relative', padding: sp }}>
+      <section style={{
+        position: 'relative',
+        padding: '80px 48px',
+      }}>
         <ArcBackground />
         <div style={{
           maxWidth: 1100,
@@ -776,12 +798,11 @@ export default function Landing() {
           background: 'linear-gradient(135deg, rgba(52, 211, 153, 0.08), rgba(6, 182, 212, 0.08))',
           border: '1px solid rgba(52, 211, 153, 0.12)',
           borderRadius: 24,
-          padding: isMobile ? '28px 20px' : '60px',
+          padding: '60px',
           display: 'flex',
-          flexDirection: isMobile ? 'column' : 'row',
-          alignItems: isMobile ? 'flex-start' : 'center',
+          alignItems: 'center',
           justifyContent: 'space-between',
-          gap: isMobile ? 24 : 60,
+          gap: 60,
         }}>
           <div>
             <h2 style={{
@@ -802,8 +823,8 @@ export default function Landing() {
               </Link>
             </div>
           </div>
-          {/* Mini app preview — hidden on mobile */}
-          {!isMobile && <div style={{
+          {/* Mini app preview */}
+          <div style={{
             ...glassCard,
             padding: 16,
             borderRadius: 14,
@@ -830,17 +851,20 @@ export default function Landing() {
                 <MiniCodePreview />
               </div>
             </div>
-          </div>}
+          </div>
         </div>
       </section>
 
       {/* ═══ FAQ SECTION ═══ */}
-      <section id="faq" style={{ position: 'relative', padding: sp }}>
+      <section id="faq" style={{
+        position: 'relative',
+        padding: '80px 48px',
+      }}>
         <div style={{
           ...glassCard,
           maxWidth: 900,
           margin: '0 auto',
-          padding: isMobile ? '28px 20px' : '60px',
+          padding: '60px',
           position: 'relative',
           zIndex: 1,
         }}>
@@ -859,12 +883,10 @@ export default function Landing() {
       {/* ═══ FOOTER ═══ */}
       <footer style={{
         borderTop: '1px solid rgba(26, 37, 64, 0.6)',
-        padding: isMobile ? '24px 20px' : '32px 48px',
+        padding: '32px 48px',
         display: 'flex',
-        flexDirection: isMobile ? 'column' : 'row',
         justifyContent: 'space-between',
-        alignItems: isMobile ? 'flex-start' : 'center',
-        gap: isMobile ? 12 : 0,
+        alignItems: 'center',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{
