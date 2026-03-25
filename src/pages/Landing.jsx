@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom"
-import { Shield, Bug, Search, KeyRound, Rocket, FlaskConical, ArrowRight, Github, ChevronRight, Zap, Lock, Globe, Code2, Scale } from "lucide-react"
+import { Bug, Search, KeyRound, Rocket, FlaskConical, ArrowRight, Github, ChevronRight, Zap, Lock, Globe, Code2, Scale } from "lucide-react"
+import Logo from "../components/Logo"
 
 /* ═══════════════════════════════════════════════════════════
    LANDING PAGE — Railway-inspired design
@@ -135,13 +136,7 @@ export default function Landing() {
         maxWidth: 1400, margin: "0 auto", width: "100%",
       }}>
         <Link to="/" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none" }}>
-          <div style={{
-            width: 32, height: 32, borderRadius: 8,
-            background: "linear-gradient(135deg, #34d399, #06b6d4)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}>
-            <Shield size={16} color="#09090f" strokeWidth={2.5} />
-          </div>
+          <Logo size={32} />
           <span style={{ fontSize: 18, fontWeight: 800, color: "#f1f5f9", letterSpacing: "-0.02em" }}>ShipSafe</span>
         </Link>
 
@@ -215,7 +210,9 @@ export default function Landing() {
           {/* CTA buttons */}
           <div className="fade-up fade-up-d3" style={{ display: "flex", gap: 16, justifyContent: "center", flexWrap: "wrap" }}>
             <Link to="/debugger" style={{
-              background: "linear-gradient(135deg, #34d399, #06b6d4)",
+              background: "linear-gradient(90deg, #34d399 0%, #6ee7b7 25%, #34d399 50%, #06b6d4 75%, #34d399 100%)",
+              backgroundSize: "200% auto",
+              animation: "shimmer 3s linear infinite",
               color: "#09090f", fontWeight: 700, fontSize: 15,
               padding: "14px 32px", borderRadius: 10,
               textDecoration: "none", display: "flex", alignItems: "center", gap: 8,
@@ -511,9 +508,7 @@ export default function Landing() {
           {/* Brand */}
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-              <div style={{ width: 28, height: 28, borderRadius: 7, background: "linear-gradient(135deg, #34d399, #06b6d4)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <Shield size={14} color="#09090f" strokeWidth={2.5} />
-              </div>
+              <Logo size={28} />
               <span style={{ fontSize: 16, fontWeight: 800, color: "#f1f5f9" }}>ShipSafe</span>
             </div>
             <p style={{ fontSize: 13, color: "#475569", lineHeight: 1.7, maxWidth: 280 }}>
@@ -573,9 +568,7 @@ export default function Landing() {
           fontSize: 12, color: "#334155",
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div style={{ width: 20, height: 20, borderRadius: 5, background: "linear-gradient(135deg, #34d399, #06b6d4)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Shield size={10} color="#09090f" strokeWidth={3} />
-            </div>
+            <Logo size={20} />
             <span>Built by Shaurya Ishan</span>
           </div>
           <span>© 2026 ShipSafe. Ship responsibly.</span>

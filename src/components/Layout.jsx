@@ -3,6 +3,7 @@ import {
   LayoutDashboard, Bug, Search, Scale, KeyRound,
   Rocket, FlaskConical, Menu, X
 } from 'lucide-react'
+import Logo from './Logo'
 import { useState, useEffect } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { useIsMobile } from '../hooks/useIsMobile'
@@ -76,13 +77,7 @@ export default function Layout() {
           alignItems: 'center',
           gap: 12,
         }}>
-          <div style={{
-            width: 32, height: 32,
-            background: 'linear-gradient(135deg, #0ea5e9, #06b6d4)',
-            borderRadius: 8,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 15, flexShrink: 0,
-          }}>🛡</div>
+          <Logo size={28} />
           <div>
             <div style={{
               fontFamily: 'var(--font-display)', fontSize: 15, fontWeight: 800,
