@@ -43,6 +43,8 @@ Response format:
   "positives": ["<short positive>"]
 }
 
+CREDENTIAL SCAN: Also check for hardcoded secrets — API keys, tokens, passwords, private keys, connection strings. Flag these as severity 'critical', category 'security', with title starting with '🔑 Hardcoded credential:'. High-entropy strings (random 20+ char alphanumeric) should also be flagged even if purpose is unclear.
+
 Rules:
 - MAX 8 issues. Prioritize the most important ones.
 - Keep descriptions to 1 sentence. Keep fixes short.

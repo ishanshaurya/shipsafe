@@ -101,9 +101,7 @@ function getMockStressTest(stack) {
   return { tiers, recommendations, stack: stackLower }
 }
 
-const STATUS_BG = { green: "rgba(34,197,94,0.08)", yellow: "rgba(245,158,11,0.08)", red: "rgba(239,68,68,0.08)" }
-const STATUS_BORDER = { green: "rgba(34,197,94,0.2)", yellow: "rgba(245,158,11,0.2)", red: "rgba(239,68,68,0.2)" }
-const STATUS_DOT = { green: "#22c55e", yellow: "#f59e0b", red: "#ef4444" }
+const STATUS_COLOR = { green: "#34d399", yellow: "#eab308", red: "#ef4444" }
 
 export default function StressTest() {
   const { user } = useAuth()
@@ -126,104 +124,163 @@ export default function StressTest() {
   }
 
   return (
-    <div className="animate-fade-in">
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-      <div style={{ marginBottom: 24, display: "flex", alignItems: "center", gap: 12 }}>
-        <div style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(234,179,8,0.1)", border: "1px solid rgba(234,179,8,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+    <div style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg) } }
+        @keyframes fadeIn { from { opacity:0; transform:translateY(6px) } to { opacity:1; transform:translateY(0) } }
+        .st-fade { animation: fadeIn 0.25s ease }
+      `}</style>
+
+      {/* Header */}
+      <div style={{ marginBottom: 20, display: "flex", alignItems: "center", gap: 14 }}>
+        <div style={{ width: 40, height: 40, borderRadius: 10, background: "rgba(234,179,8,0.08)", border: "1px solid rgba(234,179,8,0.18)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
           <FlaskConical size={18} color="#eab308" />
         </div>
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: "#f1f5f9" }}>Stress Tester</h1>
-          <p style={{ fontSize: 11, color: "#475569" }}>Describe your stack → Simulate 10 to 10K concurrent users → Find bottlenecks <span style={{ color: "#f59e0b", marginLeft: 8 }}>● Simulated</span></p>
+          <h1 style={{ fontSize: 20, fontWeight: 800, color: "rgba(255,255,255,0.85)", margin: 0, letterSpacing: "-0.02em" }}>Stress Tester</h1>
+          <p style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", margin: "3px 0 0", display: "flex", alignItems: "center", gap: 8 }}>
+            Describe your stack → Simulate 10 to 10K concurrent users → Find bottlenecks
+            <span style={{ display: "flex", alignItems: "center", gap: 4, color: "#eab308" }}>
+              <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#eab308", display: "inline-block" }} />
+              Simulated
+            </span>
+          </p>
         </div>
       </div>
 
-      <div style={{ background: "rgba(234,179,8,0.04)", border: "1px solid rgba(234,179,8,0.1)", borderRadius: 8, padding: "10px 16px", marginBottom: 16, fontSize: 11, color: "#f59e0b", display: "flex", alignItems: "center", gap: 8 }}>
-        <AlertTriangle size={13} /> This is a predictive analysis tool, not real load testing. For production, pair with k6 or Artillery.
+      {/* Disclaimer badge */}
+      <div style={{ background: "rgba(234,179,8,0.04)", border: "1px solid rgba(234,179,8,0.12)", borderRadius: 8, padding: "9px 14px", marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
+        <AlertTriangle size={12} color="rgba(234,179,8,0.6)" />
+        <span style={{ fontSize: 11, color: "rgba(234,179,8,0.6)" }}>AI-predicted · not real load testing — For production, pair with k6 or Artillery.</span>
       </div>
 
-      {/* Input */}
-      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 18, alignItems: "start" }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16, alignItems: "start" }}>
+        {/* Left — Input */}
         <div>
-          <div style={{ background: "rgba(15,22,40,0.6)", border: "1px solid rgba(56,189,248,0.08)", borderRadius: 14, overflow: "hidden", marginBottom: 12 }}>
-            <div style={{ padding: "10px 16px", borderBottom: "1px solid rgba(26,37,64,0.6)", display: "flex", justifyContent: "space-between" }}>
-              <span style={{ fontSize: 11, color: "#475569" }}>Describe your architecture</span>
-              <button onClick={() => { setStack(SAMPLE_STACK); setResult(null) }} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 11, color: "#eab308" }}>Load Sample</button>
+          {/* Editor card */}
+          <div style={{ background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, overflow: "hidden", marginBottom: 10 }}>
+            <div style={{ padding: "10px 14px", borderBottom: "1px solid rgba(255,255,255,0.05)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.25)" }}>Describe your architecture</span>
+              <button onClick={() => { setStack(SAMPLE_STACK); setResult(null) }}
+                style={{ background: "none", border: "none", cursor: "pointer", fontSize: 11, color: "#eab308", fontFamily: "inherit" }}>
+                Load Sample
+              </button>
             </div>
-            <textarea value={stack} onChange={e => setStack(e.target.value)}
+            <textarea
+              value={stack}
+              onChange={e => setStack(e.target.value)}
               placeholder={"Describe your full stack:\n- Frontend hosting\n- Backend / API\n- Database (type, tier, limits)\n- AI APIs used\n- Caching layer\n- CDN\n- Auth system"}
-              style={{ width: "100%", minHeight: 320, background: "transparent", border: "none", outline: "none", resize: "vertical", color: "#e2e8f0", fontFamily: "monospace", fontSize: 12, lineHeight: 1.8, padding: 16 }} />
+              style={{
+                width: "100%", minHeight: 320, background: "transparent", border: "none", outline: "none",
+                resize: "vertical", color: "rgba(255,255,255,0.75)", fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                fontSize: 12, lineHeight: 1.8, padding: "14px 16px",
+              }}
+            />
           </div>
 
-          <button onClick={runTest} disabled={loading || !stack.trim()}
-            style={{ width: "100%", padding: 14, borderRadius: 10, border: "none", background: loading || !stack.trim() ? "#1a2540" : "#eab308", color: loading || !stack.trim() ? "#334155" : "#0a0e1a", fontSize: 14, fontWeight: 700, cursor: loading || !stack.trim() ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
-            {loading ? <><Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} /> Simulating load...</> : <><FlaskConical size={16} /> Run Stress Test</>}
+          {/* Run button */}
+          <button
+            onClick={runTest}
+            disabled={loading || !stack.trim()}
+            style={{
+              width: "100%", padding: "13px 20px", borderRadius: 9, border: "none",
+              background: loading || !stack.trim() ? "rgba(255,255,255,0.04)" : "#eab308",
+              color: loading || !stack.trim() ? "rgba(255,255,255,0.2)" : "#000",
+              fontSize: 13, fontWeight: 700, cursor: loading || !stack.trim() ? "not-allowed" : "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+              transition: "all 0.15s", fontFamily: "inherit",
+            }}>
+            {loading
+              ? <><Loader2 size={15} style={{ animation: "spin 1s linear infinite" }} /> Simulating load...</>
+              : <><FlaskConical size={15} /> Run Stress Test</>
+            }
           </button>
         </div>
 
+        {/* Right — Results */}
         <div>
           {!loading && !result && (
-            <div style={{ background: "rgba(15,22,40,0.6)", border: "1px solid rgba(56,189,248,0.08)", borderRadius: 14, padding: "60px 40px", textAlign: "center", minHeight: 400, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-              <FlaskConical size={28} color="#eab308" style={{ marginBottom: 20 }} />
-              <h3 style={{ fontSize: 18, fontWeight: 700, color: "#f1f5f9", marginBottom: 8 }}>Describe your stack</h3>
-              <p style={{ fontSize: 13, color: "#475569", lineHeight: 1.7, maxWidth: 340 }}>Simulates 10 → 100 → 1K → 10K concurrent users and identifies which component breaks first.</p>
+            <div style={{ background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "60px 32px", textAlign: "center", minHeight: 400, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+              <div style={{ width: 48, height: 48, borderRadius: 12, background: "rgba(234,179,8,0.07)", border: "1px solid rgba(234,179,8,0.15)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 18 }}>
+                <FlaskConical size={22} color="#eab308" />
+              </div>
+              <h3 style={{ fontSize: 16, fontWeight: 700, color: "rgba(255,255,255,0.7)", margin: "0 0 8px" }}>Describe your stack</h3>
+              <p style={{ fontSize: 12, color: "rgba(255,255,255,0.25)", lineHeight: 1.7, maxWidth: 300, margin: 0 }}>Simulates 10 → 100 → 1K → 10K concurrent users and identifies which component breaks first.</p>
             </div>
           )}
 
           {loading && (
-            <div style={{ background: "rgba(15,22,40,0.6)", border: "1px solid rgba(56,189,248,0.08)", borderRadius: 14, padding: "80px 40px", textAlign: "center", minHeight: 400, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-              <Loader2 size={36} color="#eab308" style={{ animation: "spin 1.5s linear infinite", marginBottom: 20 }} />
-              <h3 style={{ fontSize: 16, fontWeight: 700, color: "#f1f5f9", marginBottom: 6 }}>Simulating concurrent users</h3>
-              <p style={{ fontSize: 12, color: "#475569" }}>10 → 100 → 1,000 → 10,000...</p>
+            <div style={{ background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "80px 32px", textAlign: "center", minHeight: 400, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+              <Loader2 size={32} color="#eab308" style={{ animation: "spin 1.5s linear infinite", marginBottom: 18 }} />
+              <h3 style={{ fontSize: 14, fontWeight: 600, color: "rgba(255,255,255,0.6)", margin: "0 0 6px" }}>Simulating concurrent users</h3>
+              <p style={{ fontSize: 12, color: "rgba(255,255,255,0.2)", margin: 0 }}>10 → 100 → 1,000 → 10,000...</p>
             </div>
           )}
 
           {result && (
-            <div className="animate-fade-in" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div className="st-fade" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <ReportButton
                 scanType="stress-test"
                 title={`Stress test · ${result.tiers?.length ?? 0} tiers analyzed`}
                 resultData={result}
               />
 
-              {/* Tier results */}
-              {result.tiers.map((tier, ti) => (
-                <div key={ti} style={{ background: STATUS_BG[tier.status], border: `1px solid ${STATUS_BORDER[tier.status]}`, borderRadius: 12, padding: "16px 20px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <Users size={16} color={STATUS_DOT[tier.status]} />
-                      <span style={{ fontSize: 16, fontWeight: 700, color: "#e2e8f0" }}>{tier.label}</span>
-                      <span style={{ fontSize: 10, color: "#64748b" }}>{TIERS[ti].desc}</span>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <span style={{ fontSize: 11, color: "#94a3b8", display: "flex", alignItems: "center", gap: 4 }}><Clock size={11} /> {tier.responseTime}</span>
-                      <span style={{ fontSize: 10, fontWeight: 700, color: STATUS_DOT[tier.status], letterSpacing: "0.08em" }}>{tier.label}</span>
-                    </div>
-                  </div>
-
-                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                    {tier.components.map((comp, ci) => (
-                      <div key={ci} style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 11, padding: "4px 0" }}>
-                        <div style={{ width: 7, height: 7, borderRadius: "50%", background: STATUS_DOT[comp.status], marginTop: 4, flexShrink: 0 }} />
-                        <span style={{ color: "#94a3b8", minWidth: 70, fontWeight: 600 }}>{comp.name}</span>
-                        <span style={{ color: "#64748b" }}>{comp.detail}</span>
+              {/* Tier cards */}
+              {result.tiers.map((tier, ti) => {
+                const tierColor = STATUS_COLOR[tier.status]
+                return (
+                  <div key={ti} style={{
+                    background: "#0a0a0a",
+                    border: "1px solid rgba(255,255,255,0.06)",
+                    borderLeft: `3px solid ${tierColor}`,
+                    borderRadius: 10,
+                    padding: "14px 16px",
+                  }}>
+                    {/* Tier header */}
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <Users size={14} color={tierColor} />
+                        <span style={{ fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.8)" }}>{tier.label}</span>
+                        <span style={{ fontSize: 10, color: "rgba(255,255,255,0.25)" }}>{TIERS[ti].desc}</span>
                       </div>
-                    ))}
-                  </div>
-
-                  {tier.bottleneck && (
-                    <div style={{ marginTop: 10, fontSize: 11, color: "#ef4444", display: "flex", alignItems: "center", gap: 6, background: "rgba(239,68,68,0.06)", padding: "6px 10px", borderRadius: 6 }}>
-                      <AlertTriangle size={12} /> Bottleneck: {tier.bottleneck}
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", display: "flex", alignItems: "center", gap: 4 }}>
+                          <Clock size={10} /> {tier.responseTime}
+                        </span>
+                        <span style={{
+                          fontSize: 9, fontWeight: 700, color: tierColor,
+                          background: `${tierColor}12`, border: `1px solid ${tierColor}25`,
+                          padding: "2px 7px", borderRadius: 4, letterSpacing: "0.07em",
+                        }}>{tier.label}</span>
+                      </div>
                     </div>
-                  )}
-                </div>
-              ))}
+
+                    {/* Components */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                      {tier.components.map((comp, ci) => (
+                        <div key={ci} style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 11 }}>
+                          <div style={{ width: 6, height: 6, borderRadius: "50%", background: STATUS_COLOR[comp.status], marginTop: 4, flexShrink: 0 }} />
+                          <span style={{ color: "rgba(255,255,255,0.5)", minWidth: 64, fontWeight: 600, flexShrink: 0 }}>{comp.name}</span>
+                          <span style={{ color: "rgba(255,255,255,0.3)", lineHeight: 1.5 }}>{comp.detail}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Bottleneck */}
+                    {tier.bottleneck && (
+                      <div style={{ marginTop: 10, fontSize: 11, color: "#ef4444", display: "flex", alignItems: "center", gap: 6, background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.12)", padding: "6px 10px", borderRadius: 6 }}>
+                        <AlertTriangle size={11} /> Bottleneck: {tier.bottleneck}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
 
               {/* Recommendations */}
-              <div style={{ background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.12)", borderRadius: 12, padding: "18px 20px" }}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: "#34d399", marginBottom: 12, letterSpacing: "0.08em" }}>SCALING RECOMMENDATIONS</div>
+              <div style={{ background: "#0a0a0a", border: "1px solid rgba(52,211,153,0.12)", borderRadius: 10, padding: "16px 18px" }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "#34d399", marginBottom: 12, letterSpacing: "0.1em" }}>SCALING RECOMMENDATIONS</div>
                 {result.recommendations.map((r, i) => (
-                  <div key={i} style={{ display: "flex", gap: 8, fontSize: 12, color: "#94a3b8", lineHeight: 1.6, marginBottom: 8 }}>
+                  <div key={i} style={{ display: "flex", gap: 8, fontSize: 12, color: "rgba(255,255,255,0.4)", lineHeight: 1.6, marginBottom: 7 }}>
                     <span style={{ color: "#34d399", flexShrink: 0 }}>→</span> {r}
                   </div>
                 ))}
