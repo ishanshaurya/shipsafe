@@ -1,8 +1,10 @@
 import { useState } from "react"
 import { Search, Play, Loader2, AlertTriangle, CheckCircle, ChevronDown, ChevronRight, FileCode, Shield, Zap, TestTube, Lock, PackageCheck, Sparkles } from "lucide-react"
-import { supabase } from "../lib/supabase"
+import { saveScan } from "../services/supabaseService"
+import { extractScore } from "../services/scanService"
 import { useAuth } from "../hooks/useAuth"
 import { useIsMobile } from "../hooks/useIsMobile"
+import ReportButton from "../components/ReportButton"
 
 /* ═══════════════════════════════════════════════════════════
    VIBE-CODE AUDIT — ShipSafe's #3 Feature
@@ -243,18 +245,8 @@ export default function Audit() {
     const audit = getMockAudit(code)
     setResult(audit)
     if (user) {
-      try {
-        const { error: dbError } = await supabase.from("scan_history").insert({
-          user_id: user.id,
-          scan_type: "audit",
-          input_snippet: code.slice(0, 500),
-          result: audit,
-          score: audit.overallScore,
-        })
-        if (dbError) console.error("Failed to save scan:", dbError.message)
-      } catch (err) {
-        console.error("Supabase save error:", err)
-      }
+      saveScan(user.id, "audit", code.slice(0, 500), audit, extractScore("audit", audit))
+        .then(({ error }) => { if (error) console.error("Failed to save scan:", error.message) })
     }
     const ae = {}
     audit.issues.forEach(i => { if (i.severity === "critical" || i.severity === "high") ae[i.id] = true })
@@ -362,6 +354,12 @@ export default function Audit() {
                   <ScoreBar key={c.key} label={c.label} score={result.scores[c.key]} color={c.color} icon={c.icon} />
                 ))}
               </div>
+
+              <ReportButton
+                scanType="audit"
+                title={`Vibe-Code Audit · score ${result.overallScore ?? "—"}`}
+                resultData={result}
+              />
 
               {/* Filter tabs */}
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>

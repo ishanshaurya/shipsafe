@@ -4,6 +4,7 @@ import { callAI, extractScore } from "../services/scanService"
 import { saveScan } from "../services/supabaseService"
 import { useAuth } from "../hooks/useAuth"
 import { useIsMobile } from "../hooks/useIsMobile"
+import ReportButton from "../components/ReportButton"
 
 const LANGS = ["JavaScript","TypeScript","Python","Java","Go","Rust","C++","PHP","Ruby","SQL"]
 
@@ -281,6 +282,12 @@ export default function Debugger() {
                   )}
                 </div>
               </div>
+
+              <ReportButton
+                scanType="debugger"
+                title={`Debugger scan — ${lang} · ${result.stats?.totalIssues ?? 0} issues`}
+                resultData={result}
+              />
 
               <div style={{ display: "flex", justifyContent: "space-between", padding: "0 4px" }}>
                 <span style={{ fontSize: 11, color: "#475569", letterSpacing: "0.1em" }}>{result.issues.length} ISSUES FOUND</span>

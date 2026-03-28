@@ -1,8 +1,10 @@
 import { useState } from "react"
 import { FlaskConical, Play, Loader2, AlertTriangle, CheckCircle, Users, Server, Database, Wifi, Zap, Clock } from "lucide-react"
-import { supabase } from "../lib/supabase"
+import { saveScan } from "../services/supabaseService"
+import { extractScore } from "../services/scanService"
 import { useAuth } from "../hooks/useAuth"
 import { useIsMobile } from "../hooks/useIsMobile"
+import ReportButton from "../components/ReportButton"
 
 /* ═══════════════════════════════════════════════════════════
    STRESS TESTER — ShipSafe Stage 3
@@ -117,18 +119,8 @@ export default function StressTest() {
     const stressResult = getMockStressTest(stack)
     setResult(stressResult)
     if (user) {
-      try {
-        const { error: dbError } = await supabase.from("scan_history").insert({
-          user_id: user.id,
-          scan_type: "stress-test",
-          input_snippet: stack.slice(0, 500),
-          result: stressResult,
-          score: null,
-        })
-        if (dbError) console.error("Failed to save scan:", dbError.message)
-      } catch (err) {
-        console.error("Supabase save error:", err)
-      }
+      saveScan(user.id, "stress-test", stack.slice(0, 500), stressResult, extractScore("stress-test", stressResult))
+        .then(({ error }) => { if (error) console.error("Failed to save scan:", error.message) })
     }
     setLoading(false)
   }
@@ -188,6 +180,12 @@ export default function StressTest() {
 
           {result && (
             <div className="animate-fade-in" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <ReportButton
+                scanType="stress-test"
+                title={`Stress test · ${result.tiers?.length ?? 0} tiers analyzed`}
+                resultData={result}
+              />
+
               {/* Tier results */}
               {result.tiers.map((tier, ti) => (
                 <div key={ti} style={{ background: STATUS_BG[tier.status], border: `1px solid ${STATUS_BORDER[tier.status]}`, borderRadius: 12, padding: "16px 20px" }}>

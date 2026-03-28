@@ -1,8 +1,10 @@
 import { useState } from "react"
 import { Rocket, Play, Loader2, CheckCircle, AlertTriangle, AlertCircle, X as XIcon, ChevronDown, ChevronRight, Server, Shield, Globe, Key, Database, Wifi } from "lucide-react"
-import { supabase } from "../lib/supabase"
+import { saveScan } from "../services/supabaseService"
+import { extractScore } from "../services/scanService"
 import { useAuth } from "../hooks/useAuth"
 import { useIsMobile } from "../hooks/useIsMobile"
+import ReportButton from "../components/ReportButton"
 
 /* ═══════════════════════════════════════════════════════════
    DEPLOY READINESS CHECKER — ShipSafe Stage 3
@@ -138,18 +140,8 @@ export default function DeployCheck() {
     const res = getMockDeployCheck(config, platform)
     setResult(res)
     if (user) {
-      try {
-        const { error: dbError } = await supabase.from("scan_history").insert({
-          user_id: user.id,
-          scan_type: "deploy-check",
-          input_snippet: config.slice(0, 500),
-          result: res,
-          score: res.score,
-        })
-        if (dbError) console.error("Failed to save scan:", dbError.message)
-      } catch (err) {
-        console.error("Supabase save error:", err)
-      }
+      saveScan(user.id, "deploy-check", config.slice(0, 500), res, extractScore("deploy-check", res))
+        .then(({ error }) => { if (error) console.error("Failed to save scan:", error.message) })
     }
     const ae = {}
     res.checks.forEach(c => { if (c.status === "fail") ae[c.id] = true })
@@ -231,6 +223,12 @@ export default function DeployCheck() {
                   </div>
                 ))}
               </div>
+
+              <ReportButton
+                scanType="deploy-check"
+                title={`Deploy check · ${result.checks?.filter(c => c.status === "fail").length ?? 0} failures`}
+                resultData={result}
+              />
 
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 {result.checks.map(check => {

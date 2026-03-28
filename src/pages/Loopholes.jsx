@@ -1,8 +1,10 @@
 import { useState } from "react"
 import { KeyRound, Search, Loader2, AlertTriangle, ChevronDown, ChevronRight, Globe, Shield, Scale, FileWarning, Lightbulb, TrendingUp } from "lucide-react"
-import { supabase } from "../lib/supabase"
+import { saveScan } from "../services/supabaseService"
+import { extractScore } from "../services/scanService"
 import { useAuth } from "../hooks/useAuth"
 import { useIsMobile } from "../hooks/useIsMobile"
+import ReportButton from "../components/ReportButton"
 
 /* ═══════════════════════════════════════════════════════════
    LOOPHOLE FINDER — ShipSafe's #2 Feature
@@ -198,18 +200,8 @@ export default function Loopholes() {
     const analysis = getMockAnalysis(description, selected)
     setResult(analysis)
     if (user) {
-      try {
-        const { error: dbError } = await supabase.from("scan_history").insert({
-          user_id: user.id,
-          scan_type: "loopholes",
-          input_snippet: description.slice(0, 500),
-          result: analysis,
-          score: analysis.riskScore,
-        })
-        if (dbError) console.error("Failed to save scan:", dbError.message)
-      } catch (err) {
-        console.error("Supabase save error:", err)
-      }
+      saveScan(user.id, "loopholes", description.slice(0, 500), analysis, extractScore("loopholes", analysis))
+        .then(({ error }) => { if (error) console.error("Failed to save scan:", error.message) })
     }
     const ae = {}
     analysis.greyAreas.forEach((g) => { if (g.risk === "high") ae[g.id] = true })
@@ -325,6 +317,11 @@ export default function Loopholes() {
               </div>
 
               {/* Grey areas */}
+              <ReportButton
+                scanType="loopholes"
+                title={`Loophole scan · ${result.greyAreas?.length ?? 0} grey areas found`}
+                resultData={result}
+              />
               <div style={{ fontSize: 11, color: "#475569", letterSpacing: "0.1em", padding: "0 4px" }}>
                 {result.greyAreas.length} GREY AREAS FOUND
               </div>
