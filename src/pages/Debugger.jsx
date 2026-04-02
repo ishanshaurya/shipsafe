@@ -2,7 +2,7 @@ import { useState } from "react"
 import { Link } from "react-router-dom"
 import { Bug, Play, Loader2, AlertTriangle, AlertCircle, Info, CheckCircle, ChevronDown, ChevronRight, Copy, Check, Lock, Code2, Sparkles, Github, Star } from "lucide-react"
 import { callAI, extractScore } from "../services/scanService"
-import { saveScan } from "../services/supabaseService"
+import { saveScan, attachEmbedding } from "../services/supabaseService"
 import { useAuth } from "../hooks/useAuth"
 import { useIsMobile } from "../hooks/useIsMobile"
 import ReportButton from "../components/ReportButton"
@@ -123,6 +123,7 @@ export default function Debugger() {
   const [githubLoading, setGithubLoading] = useState(false)
   const [githubInfo, setGithubInfo] = useState(null)
   const [githubError, setGithubError] = useState(null)
+  const [similarScans, setSimilarScans] = useState([])
   const toggle = (id) => setExp(p => ({ ...p, [id]: !p[id] }))
   const lc = code.split("\n").length
 
@@ -147,13 +148,47 @@ export default function Debugger() {
 
   const runScan = async () => {
     if (!code.trim()||loading) return
-    setLoading(true); setResult(null); setError(null); setExp({}); setSuggestions([])
+    setLoading(true); setResult(null); setError(null); setExp({}); setSuggestions([]); setSimilarScans([])
     try {
       const { content:parsed, error:aiError } = await callAI("debugger", { code, language:lang, context:ctx })
       if (aiError) { setError(aiError); return }
       setResult(parsed)
       setSuggestions(getSuggestions("debugger", parsed))
-      if (user) saveScan(user.id,"debugger",code,parsed,extractScore("debugger",parsed)).then(({error})=>{ if(error) console.error("Save failed:",error.message) })
+
+      if (user) {
+        saveScan(user.id,"debugger",code,parsed,extractScore("debugger",parsed)).then(({ data, error }) => {
+          if (error) { console.error("Save failed:", error.message); return }
+          const scanId = data?.[0]?.id
+          if (scanId) attachEmbedding(scanId, "debugger", parsed)
+        })
+
+        // Fetch similar past scans asynchronously — non-blocking
+        ;(async () => {
+          try {
+            const issueTitles = (parsed.issues || []).map(i => i.title).filter(Boolean).join(", ")
+            const text = `debugger: ${parsed.summary || ""}. Issues: ${issueTitles}`
+            const genRes = await fetch("/api/embed", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ action: "generate", text }),
+            })
+            if (!genRes.ok) return
+            const { embedding } = await genRes.json()
+            if (!embedding) return
+            const simRes = await fetch("/api/embed", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ action: "similar", embedding, userId: user.id }),
+            })
+            if (!simRes.ok) return
+            const { similar } = await simRes.json()
+            if (similar?.length) setSimilarScans(similar)
+          } catch (err) {
+            console.error("[Debugger] similar scans fetch failed (non-fatal):", err)
+          }
+        })()
+      }
+
       const ae={}
       parsed.issues.forEach(i=>{ if(i.severity==="critical"||i.severity==="high") ae[i.id]=true })
       setExp(ae)
@@ -334,6 +369,54 @@ export default function Debugger() {
       </div>
 
       <NextSteps suggestions={suggestions} />
+
+      {similarScans.length > 0 && (
+        <div style={{ marginTop: 32 }}>
+          <div style={{ fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.25)", letterSpacing: "0.12em", marginBottom: 12 }}>
+            SIMILAR PAST SCANS
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {similarScans.map(scan => {
+              const simPct = Math.round(scan.similarity * 100)
+              const badge = simPct > 90
+                ? { label: "Very similar", color: "#ef4444" }
+                : simPct > 70
+                  ? { label: "Similar", color: "#f97316" }
+                  : { label: "Related", color: "#eab308" }
+              const ago = (() => {
+                const diff = Date.now() - new Date(scan.created_at).getTime()
+                const m = Math.floor(diff / 60000)
+                if (m < 1) return "just now"
+                if (m < 60) return `${m}m ago`
+                const h = Math.floor(m / 60)
+                if (h < 24) return `${h}h ago`
+                return `${Math.floor(h / 24)}d ago`
+              })()
+              const typeIcon = {
+                debugger: "🐛", audit: "🔍", loopholes: "⚖️", "deploy-check": "🚀", "stress-test": "⚡"
+              }[scan.scan_type] || "🔎"
+              return (
+                <div key={scan.id} style={{ background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 10, padding: "12px 14px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                    <span style={{ fontSize: 13 }}>{typeIcon}</span>
+                    <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", flex: 1, textTransform: "capitalize" }}>{scan.scan_type.replace("-", " ")}</span>
+                    <span style={{ fontSize: 9, fontWeight: 700, color: badge.color, background: `${badge.color}18`, border: `1px solid ${badge.color}35`, padding: "2px 7px", borderRadius: 4, letterSpacing: "0.04em" }}>
+                      {simPct}% · {badge.label}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {scan.input_snippet || "—"}
+                  </div>
+                  <div style={{ display: "flex", gap: 12, marginTop: 6, fontSize: 10, color: "rgba(255,255,255,0.2)" }}>
+                    {scan.score != null && <span>Score {scan.score}</span>}
+                    <span>{ago}</span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

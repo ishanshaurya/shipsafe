@@ -146,6 +146,38 @@ export async function deleteScan(scanId) {
   }
 }
 
+/**
+ * Generate and save an embedding for a scan row. Fire-and-forget — never throws.
+ *
+ * @param {string} scanId    - UUID of the saved scan_history row
+ * @param {string} scanType  - e.g. "debugger"
+ * @param {object} result    - Parsed AI result object (must have .summary and .issues[].title)
+ */
+export async function attachEmbedding(scanId, scanType, result) {
+  try {
+    const issueTitles = (result.issues || []).map(i => i.title).filter(Boolean).join(", ")
+    const text = `${scanType}: ${result.summary || ""}. Issues: ${issueTitles}`
+
+    const genRes = await fetch("/api/embed", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "generate", text }),
+    })
+    if (!genRes.ok) return
+
+    const { embedding } = await genRes.json()
+    if (!embedding) return
+
+    await fetch("/api/embed", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "save", scanId, embedding }),
+    })
+  } catch (err) {
+    console.error("[supabaseService] attachEmbedding failed (non-fatal):", err)
+  }
+}
+
 // ─────────────────────────────────────────────
 // REGULATIONS
 // Table: regulations
