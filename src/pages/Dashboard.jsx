@@ -83,6 +83,9 @@ export default function Dashboard() {
   const [rawScans, setRawScans] = useState(null)  // unprocessed Supabase rows
   const [loading, setLoading] = useState(false)
   const [fetchError, setFetchError] = useState(null)
+  const [hoveredStat, setHoveredStat] = useState(null)
+  const [hoveredScan, setHoveredScan] = useState(null)
+  const [hoveredPipeline, setHoveredPipeline] = useState(null)
 
   useEffect(() => {
     if (!user) { setScans(null); setRawScans(null); return }
@@ -129,16 +132,33 @@ export default function Dashboard() {
   const toolsUsed = new Set(displayScans.map(s => s.type)).size
 
   return (
-    <div className="animate-fade-in">
+    <div className="animate-fade-in" style={{ fontFamily: "'Outfit', system-ui, sans-serif" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
+        @keyframes spin { to { transform: rotate(360deg) } }
+        @keyframes fadeUp { from { opacity:0; transform:translateY(24px); } to { opacity:1; transform:translateY(0); } }
+        @keyframes glowPulse { 0%,100% { box-shadow: var(--glow-base); } 50% { box-shadow: var(--glow-strong); } }
+        .db-section-1 { animation: fadeUp 0.5s cubic-bezier(0.16,1,0.3,1) forwards; opacity:0; animation-delay:0.05s; }
+        .db-section-2 { animation: fadeUp 0.5s cubic-bezier(0.16,1,0.3,1) forwards; opacity:0; animation-delay:0.12s; }
+        .db-section-3 { animation: fadeUp 0.5s cubic-bezier(0.16,1,0.3,1) forwards; opacity:0; animation-delay:0.2s; }
+        .db-section-4 { animation: fadeUp 0.5s cubic-bezier(0.16,1,0.3,1) forwards; opacity:0; animation-delay:0.28s; }
+        .db-action-card { transition: all 0.3s ease; }
+        .db-action-card:hover { transform: translateY(-2px); }
+      `}</style>
+
       {/* Header */}
-      <div style={{ marginBottom: 28 }}>
+      <div className="db-section-1" style={{ marginBottom: 28 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(56,189,248,0.1)", border: "1px solid rgba(56,189,248,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <LayoutDashboard size={18} color="#38bdf8" />
+          <div style={{
+            width: 36, height: 36, borderRadius: 10,
+            background: "linear-gradient(135deg, #34d399, #06b6d4)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            <LayoutDashboard size={18} color="#09090f" />
           </div>
           <div>
-            <h1 style={{ fontSize: 22, fontWeight: 800, color: "#f1f5f9" }}>Dashboard</h1>
-            <p style={{ fontSize: 11, color: "#475569" }}>
+            <h1 style={{ fontSize: 22, fontWeight: 800, color: "#f1f5f9", letterSpacing: "-0.02em" }}>Dashboard</h1>
+            <p style={{ fontSize: 11, color: "rgba(241,245,249,0.35)" }}>
               {user ? `Welcome back, ${user.email}` : "Welcome back. Here's your ShipSafe overview."}
             </p>
           </div>
@@ -154,32 +174,35 @@ export default function Dashboard() {
           : "#ef4444"
 
         return (
-          <div style={{
+          <div className="db-section-2" style={{
             marginBottom: 20,
-            background: "rgba(10,16,30,0.75)",
-            backdropFilter: "blur(12px)",
+            background: "rgba(241,245,249,0.02)",
+            backdropFilter: "blur(16px)",
             border: `1px solid ${glowColor}30`,
             borderRadius: 18,
             padding: "24px 28px",
+            "--glow-base": `0 0 24px ${glowColor}10, inset 0 1px 0 rgba(255,255,255,0.04)`,
+            "--glow-strong": `0 0 40px ${glowColor}20, inset 0 1px 0 rgba(255,255,255,0.06)`,
+            animation: readiness.score !== null ? "glowPulse 4s ease-in-out infinite, fadeUp 0.5s cubic-bezier(0.16,1,0.3,1) forwards" : "fadeUp 0.5s cubic-bezier(0.16,1,0.3,1) forwards",
             boxShadow: `0 0 32px ${glowColor}14, inset 0 1px 0 rgba(255,255,255,0.04)`,
           }}>
-            <div style={{ fontSize: 10, color: "#475569", letterSpacing: "0.12em", marginBottom: 16 }}>SHIP-READINESS SCORE</div>
+            <div style={{ fontSize: 10, color: "#34d399", letterSpacing: "0.12em", marginBottom: 16, fontWeight: 600 }}>SHIP-READINESS SCORE</div>
 
             {readiness.score === null ? (
               /* ── Empty state ── */
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 20 }}>
                 <div>
                   <div style={{ fontSize: 18, fontWeight: 700, color: "#94a3b8", marginBottom: 6 }}>No scan data yet</div>
-                  <div style={{ fontSize: 13, color: "#475569" }}>Run your first scan to get a Ship-Readiness Score.</div>
+                  <div style={{ fontSize: 13, color: "rgba(241,245,249,0.3)" }}>Run your first scan to get a Ship-Readiness Score.</div>
                 </div>
                 <Link to="/debugger" style={{
-                  background: "rgba(56,189,248,0.1)", border: "1px solid rgba(56,189,248,0.25)",
-                  color: "#38bdf8", borderRadius: 10, padding: "10px 20px",
+                  background: "rgba(52,211,153,0.1)", border: "1px solid rgba(52,211,153,0.25)",
+                  color: "#34d399", borderRadius: 10, padding: "10px 20px",
                   fontSize: 13, fontWeight: 600, textDecoration: "none", flexShrink: 0,
                   transition: "all 0.2s",
                 }}
-                  onMouseEnter={e => { e.currentTarget.style.background = "rgba(56,189,248,0.18)" }}
-                  onMouseLeave={e => { e.currentTarget.style.background = "rgba(56,189,248,0.1)" }}>
+                  onMouseEnter={e => { e.currentTarget.style.background = "rgba(52,211,153,0.18)" }}
+                  onMouseLeave={e => { e.currentTarget.style.background = "rgba(52,211,153,0.1)" }}>
                   Start Scanning →
                 </Link>
               </div>
@@ -199,7 +222,7 @@ export default function Dashboard() {
                   {/* Completeness bar */}
                   <div style={{ marginBottom: 14 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
-                      <span style={{ fontSize: 11, color: "#64748b" }}>Tool coverage</span>
+                      <span style={{ fontSize: 11, color: "rgba(241,245,249,0.4)" }}>Tool coverage</span>
                       <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>
                         {Math.round(readiness.completeness * 4)}/4 tools scanned
                       </span>
@@ -233,7 +256,7 @@ export default function Dashboard() {
                     {Object.entries(readiness.breakdown).map(([type, info]) => (
                       <div key={type}>
                         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
-                          <span style={{ fontSize: 11, color: "#64748b" }}>{toolLabel(type)}</span>
+                          <span style={{ fontSize: 11, color: "rgba(241,245,249,0.4)" }}>{toolLabel(type)}</span>
                           <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>{info.adjusted}</span>
                         </div>
                         <div style={{ height: 4, background: "rgba(255,255,255,0.05)", borderRadius: 99, overflow: "hidden" }}>
@@ -256,47 +279,62 @@ export default function Dashboard() {
       })()}
 
       {/* Stats row */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
+      <div className="db-section-3" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
         {[
           { label: "Total Scans", value: String(totalScans), icon: Activity, color: "#38bdf8" },
           { label: "Issues Found", value: String(issuesFound), icon: Bug, color: "#ef4444" },
           { label: "Avg Score", value: scoredScans.length ? String(avgScore) : "—", icon: TrendingUp, color: "#f59e0b" },
           { label: "Tools Used", value: `${toolsUsed}/6`, icon: Zap, color: "#22c55e" },
         ].map((stat, i) => (
-          <div key={i} style={{
-            background: "rgba(15,22,40,0.6)", border: "1px solid rgba(56,189,248,0.08)",
-            borderRadius: 14, padding: "20px 18px",
-            display: "flex", alignItems: "center", gap: 14,
-          }}>
+          <div
+            key={i}
+            onMouseEnter={() => setHoveredStat(i)}
+            onMouseLeave={() => setHoveredStat(null)}
+            style={{
+              background: "rgba(241,245,249,0.02)",
+              border: "1px solid rgba(241,245,249,0.06)",
+              borderRadius: 14, padding: "20px 18px",
+              display: "flex", alignItems: "center", gap: 14,
+              transition: "all 0.3s",
+              transform: hoveredStat === i ? "translateY(-3px)" : "translateY(0)",
+              boxShadow: hoveredStat === i ? "0 8px 25px rgba(0,0,0,0.2)" : "none",
+            }}>
             <div style={{ width: 42, height: 42, borderRadius: 10, background: `${stat.color}12`, border: `1px solid ${stat.color}25`, display: "flex", alignItems: "center", justifyContent: "center" }}>
               <stat.icon size={18} color={stat.color} />
             </div>
             <div>
-              <div style={{ fontSize: 24, fontWeight: 800, color: stat.color }}>{stat.value}</div>
-              <div style={{ fontSize: 10, color: "#475569", letterSpacing: "0.06em" }}>{stat.label.toUpperCase()}</div>
+              <div style={{ fontSize: 24, fontWeight: 800, color: stat.color, letterSpacing: "-0.02em" }}>{stat.value}</div>
+              <div style={{ fontSize: 10, color: "rgba(241,245,249,0.3)", letterSpacing: "0.06em" }}>{stat.label.toUpperCase()}</div>
             </div>
           </div>
         ))}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
+      <div className="db-section-4" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
         {/* Quick Actions */}
-        <div style={{ background: "rgba(15,22,40,0.6)", border: "1px solid rgba(56,189,248,0.08)", borderRadius: 14, padding: "20px" }}>
-          <div style={{ fontSize: 11, color: "#475569", letterSpacing: "0.1em", marginBottom: 14 }}>QUICK ACTIONS</div>
+        <div style={{ background: "rgba(241,245,249,0.02)", border: "1px solid rgba(241,245,249,0.06)", borderRadius: 14, padding: "20px" }}>
+          <div style={{ fontSize: 11, color: "#34d399", letterSpacing: "0.1em", marginBottom: 14, fontWeight: 600 }}>QUICK ACTIONS</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
             {TOOLS.map((tool, i) => (
-              <Link key={i} to={tool.path} style={{
+              <Link key={i} to={tool.path} className="db-action-card" style={{
                 background: `${tool.color}08`, border: `1px solid ${tool.color}18`,
-                borderRadius: 10, padding: "14px 14px", textDecoration: "none",
+                borderRadius: 12, padding: "14px 14px", textDecoration: "none",
                 display: "flex", alignItems: "center", gap: 10,
-                transition: "all 0.2s",
               }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = `${tool.color}40`; e.currentTarget.style.transform = "translateY(-2px)" }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = `${tool.color}18`; e.currentTarget.style.transform = "translateY(0)" }}>
+                onMouseEnter={e => {
+                  e.currentTarget.style.borderColor = `${tool.color}40`
+                  e.currentTarget.style.borderLeft = `3px solid ${tool.color}`
+                  e.currentTarget.style.paddingLeft = "11px"
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.borderColor = `${tool.color}18`
+                  e.currentTarget.style.borderLeft = `1px solid ${tool.color}18`
+                  e.currentTarget.style.paddingLeft = "14px"
+                }}>
                 <tool.icon size={16} color={tool.color} />
                 <div>
                   <div style={{ fontSize: 12, fontWeight: 600, color: "#e2e8f0" }}>{tool.name}</div>
-                  <div style={{ fontSize: 10, color: "#475569" }}>{tool.desc}</div>
+                  <div style={{ fontSize: 10, color: "rgba(241,245,249,0.3)" }}>{tool.desc}</div>
                 </div>
               </Link>
             ))}
@@ -304,15 +342,14 @@ export default function Dashboard() {
         </div>
 
         {/* Recent Scans */}
-        <div style={{ background: "rgba(15,22,40,0.6)", border: "1px solid rgba(56,189,248,0.08)", borderRadius: 14, padding: "20px" }}>
+        <div style={{ background: "rgba(241,245,249,0.02)", border: "1px solid rgba(241,245,249,0.06)", borderRadius: 14, padding: "20px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-            <span style={{ fontSize: 11, color: "#475569", letterSpacing: "0.1em" }}>RECENT SCANS</span>
-            <span style={{ fontSize: 10, color: isReal ? "#34d399" : "#334155" }}>
+            <span style={{ fontSize: 11, color: "#34d399", letterSpacing: "0.1em", fontWeight: 600 }}>RECENT SCANS</span>
+            <span style={{ fontSize: 10, color: isReal ? "#34d399" : "rgba(241,245,249,0.2)" }}>
               {isReal ? "Live data" : "Demo data"}
             </span>
           </div>
 
-          {/* ✅ TASK 2: Error toast for failed Supabase fetch */}
           {fetchError && (
             <div style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 8, padding: "10px 14px", marginBottom: 10, fontSize: 11, color: "#ef4444" }}>
               {fetchError}
@@ -320,13 +357,13 @@ export default function Dashboard() {
           )}
 
           {loading && (
-            <div style={{ textAlign: "center", padding: "40px 0", fontSize: 12, color: "#475569" }}>
+            <div style={{ textAlign: "center", padding: "40px 0", fontSize: 12, color: "rgba(241,245,249,0.3)" }}>
               Loading...
             </div>
           )}
 
           {!loading && displayScans.length === 0 && (
-            <div style={{ textAlign: "center", padding: "40px 0", fontSize: 12, color: "#475569" }}>
+            <div style={{ textAlign: "center", padding: "40px 0", fontSize: 12, color: "rgba(241,245,249,0.3)" }}>
               No scans yet — run a tool to get started.
             </div>
           )}
@@ -334,22 +371,30 @@ export default function Dashboard() {
           {!loading && displayScans.length > 0 && (
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {displayScans.map((scan) => (
-                <div key={scan.id} style={{
-                  display: "flex", alignItems: "center", gap: 12,
-                  padding: "10px 12px", borderRadius: 8,
-                  background: "rgba(8,12,22,0.4)", border: "1px solid rgba(26,37,64,0.4)",
-                }}>
+                <div
+                  key={scan.id}
+                  onMouseEnter={() => setHoveredScan(scan.id)}
+                  onMouseLeave={() => setHoveredScan(null)}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 12,
+                    padding: "10px 12px", borderRadius: 8,
+                    background: hoveredScan === scan.id ? "rgba(241,245,249,0.03)" : "rgba(241,245,249,0.01)",
+                    border: "1px solid rgba(241,245,249,0.05)",
+                    transition: "all 0.2s ease",
+                    transform: hoveredScan === scan.id ? "translateX(4px)" : "translateX(0)",
+                    cursor: "pointer",
+                  }}>
                   <div style={{ width: 8, height: 8, borderRadius: "50%", background: scan.color, flexShrink: 0 }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 12, color: "#e2e8f0", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{scan.title}</div>
-                    <div style={{ fontSize: 10, color: "#475569" }}>{scan.type} • {scan.issues} issues</div>
+                    <div style={{ fontSize: 10, color: "rgba(241,245,249,0.3)" }}>{scan.type} • {scan.issues} issues</div>
                   </div>
                   {scan.score !== null && (
                     <div style={{ fontSize: 14, fontWeight: 700, color: scan.score >= 60 ? "#22c55e" : scan.score >= 40 ? "#f59e0b" : "#ef4444", flexShrink: 0 }}>
                       {scan.score}
                     </div>
                   )}
-                  <div style={{ fontSize: 10, color: "#334155", display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+                  <div style={{ fontSize: 10, color: "rgba(241,245,249,0.2)", display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
                     <Clock size={10} /> {scan.time}
                   </div>
                 </div>
@@ -358,7 +403,7 @@ export default function Dashboard() {
           )}
 
           {!isReal && (
-            <div style={{ textAlign: "center", marginTop: 12, fontSize: 11, color: "#334155" }}>
+            <div style={{ textAlign: "center", marginTop: 12, fontSize: 11, color: "rgba(241,245,249,0.2)" }}>
               Sign in to save and track your scan history
             </div>
           )}
@@ -366,26 +411,32 @@ export default function Dashboard() {
       </div>
 
       {/* Pipeline overview */}
-      <div style={{ background: "rgba(15,22,40,0.6)", border: "1px solid rgba(56,189,248,0.08)", borderRadius: 14, padding: "20px" }}>
-        <div style={{ fontSize: 11, color: "#475569", letterSpacing: "0.1em", marginBottom: 16 }}>THE SHIPSAFE PIPELINE</div>
+      <div className="db-section-4" style={{ background: "rgba(241,245,249,0.02)", border: "1px solid rgba(241,245,249,0.06)", borderRadius: 16, padding: "20px" }}>
+        <div style={{ fontSize: 11, color: "#34d399", letterSpacing: "0.1em", marginBottom: 16, fontWeight: 600 }}>THE SHIPSAFE PIPELINE</div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
           {PIPELINE_STEPS.map((step, i) => (
-            <div key={i} style={{
-              background: `${step.color}08`, border: `1px solid ${step.color}18`,
-              borderRadius: 12, padding: "18px 16px", position: "relative",
-            }}>
+            <div
+              key={i}
+              onMouseEnter={() => setHoveredPipeline(i)}
+              onMouseLeave={() => setHoveredPipeline(null)}
+              style={{
+                background: "rgba(241,245,249,0.02)",
+                border: `1px solid ${hoveredPipeline === i ? step.color + "30" : "rgba(241,245,249,0.06)"}`,
+                borderRadius: 16, padding: "18px 16px", position: "relative",
+                transition: "all 0.3s",
+              }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: step.color, letterSpacing: "0.12em", marginBottom: 8 }}>
                 STAGE {step.num}
               </div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: "#f1f5f9", marginBottom: 4 }}>{step.label}</div>
-              <div style={{ fontSize: 12, color: "#94a3b8", fontStyle: "italic", marginBottom: 10 }}>"{step.question}"</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: "#f1f5f9", marginBottom: 4, letterSpacing: "-0.02em" }}>{step.label}</div>
+              <div style={{ fontSize: 12, color: "rgba(241,245,249,0.4)", fontStyle: "italic", marginBottom: 10 }}>"{step.question}"</div>
               <div style={{ display: "flex", gap: 6 }}>
                 {step.tools.map((tool, j) => (
                   <span key={j} style={{ fontSize: 9, fontWeight: 600, color: step.color, background: `${step.color}15`, padding: "3px 8px", borderRadius: 4 }}>{tool}</span>
                 ))}
               </div>
               {i < 2 && (
-                <div style={{ position: "absolute", right: -14, top: "50%", transform: "translateY(-50%)", color: "#253352", fontSize: 18 }}>→</div>
+                <div style={{ position: "absolute", right: -14, top: "50%", transform: "translateY(-50%)", color: "rgba(241,245,249,0.15)", fontSize: 18 }}>→</div>
               )}
             </div>
           ))}

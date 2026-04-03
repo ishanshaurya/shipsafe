@@ -5,6 +5,11 @@
 //
 // Supports: public repos (no auth needed), private repos (with GITHUB_TOKEN env var)
 // Rate limits: 60 req/hr without token, 5000 req/hr with token
+//
+// Modes:
+//   { url }                        → default: auto-select files, fetch content, return combined code
+//   { url, mode: "list" }          → fast: return file tree only (no content), one API call per dir
+//   { url, files: ["path1", ...] } → selective: fetch only the specified file paths
 
 // File extensions we care about for code scanning
 const CODE_EXTENSIONS = [
@@ -21,9 +26,12 @@ const CONFIG_FILES = [
 ]
 
 // Max files to fetch (GitHub API rate limit protection)
-const MAX_FILES = 15
+const MAX_FILES = 30
 // Max file size in bytes (skip huge files)
 const MAX_FILE_SIZE = 50000 // 50KB
+// If total selected file size exceeds this, cap at LARGE_LIMIT instead of MAX_FILES
+const TOTAL_SIZE_THRESHOLD = 100 * 1024 // 100KB
+const LARGE_LIMIT = 15
 
 function parseGitHubUrl(url) {
   // Handles: github.com/owner/repo, github.com/owner/repo/tree/branch/path
@@ -88,6 +96,53 @@ async function fetchFileContent(item, token) {
   }
 }
 
+// Collect all candidate files from key directories (no content fetching)
+async function collectAllFiles(owner, repo, token) {
+  const paths = ["", "/src", "/app", "/lib", "/server", "/api", "/pages", "/components"]
+  const allFiles = []
+  const seen = new Set()
+
+  for (const dir of paths) {
+    try {
+      const contents = await githubFetch(
+        `/repos/${owner}/${repo}/contents${dir}`,
+        token
+      )
+      if (Array.isArray(contents)) {
+        for (const item of contents) {
+          if (shouldIncludeFile(item) && !seen.has(item.path)) {
+            seen.add(item.path)
+            allFiles.push({
+              name: item.name,
+              path: item.path,
+              size: item.size,
+              full_path: `${owner}/${repo}/contents/${item.path}`,
+            })
+          }
+        }
+      }
+    } catch {
+      // Directory doesn't exist — skip
+    }
+  }
+
+  return allFiles
+}
+
+// Prioritize and select files, applying the smart size limit
+function selectFiles(allFiles) {
+  const configs = allFiles.filter((f) => CONFIG_FILES.includes(f.name))
+  const source = allFiles
+    .filter((f) => !CONFIG_FILES.includes(f.name))
+    .sort((a, b) => b.size - a.size) // Larger files first (more to scan)
+
+  const candidates = [...configs, ...source]
+  const totalSize = candidates.reduce((sum, f) => sum + f.size, 0)
+  const limit = totalSize < TOTAL_SIZE_THRESHOLD ? MAX_FILES : LARGE_LIMIT
+
+  return candidates.slice(0, limit)
+}
+
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*")
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS")
@@ -98,7 +153,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" })
   }
 
-  const { url } = req.body
+  const { url, mode, files } = req.body
   if (!url || !url.trim()) {
     return res.status(400).json({ error: "No GitHub URL provided" })
   }
@@ -111,59 +166,97 @@ export default async function handler(req, res) {
   const token = process.env.GITHUB_TOKEN || null
 
   try {
-    // Step 1: Get repo info
+    // Get repo metadata (always needed)
     const repo = await githubFetch(`/repos/${parsed.owner}/${parsed.repo}`, token)
 
-    // Step 2: Get file tree (recursive, top-level + src/ + app/ + lib/)
-    const paths = ["", "/src", "/app", "/lib", "/server", "/api", "/pages", "/components"]
-    const allFiles = []
+    // ── MODE: list ────────────────────────────────────────────────────────────
+    // Returns the file tree with auto-selection flags. No content fetching.
+    if (mode === "list") {
+      const allFiles = await collectAllFiles(parsed.owner, parsed.repo, token)
 
-    for (const dir of paths) {
-      try {
-        const contents = await githubFetch(
-          `/repos/${parsed.owner}/${parsed.repo}/contents${dir}`,
-          token
-        )
-        if (Array.isArray(contents)) {
-          for (const item of contents) {
-            if (shouldIncludeFile(item)) {
-              allFiles.push({
-                name: item.name,
-                path: item.path,
-                size: item.size,
-                full_path: `${parsed.owner}/${parsed.repo}/contents/${item.path}`,
-              })
-            }
-          }
-        }
-      } catch {
-        // Directory doesn't exist — skip
+      if (allFiles.length === 0) {
+        return res.status(404).json({ error: "No scannable source files found in this repo" })
       }
+
+      const selected = selectFiles(allFiles)
+      const autoSelectedPaths = new Set(selected.map((f) => f.path))
+
+      return res.status(200).json({
+        repo: {
+          name: repo.full_name,
+          description: repo.description,
+          language: repo.language,
+          stars: repo.stargazers_count,
+          url: repo.html_url,
+        },
+        files: allFiles.map((f) => ({
+          name: f.name,
+          path: f.path,
+          size: f.size,
+          autoSelected: autoSelectedPaths.has(f.path),
+        })),
+        autoSelectedCount: selected.length,
+      })
     }
 
-    // Step 3: Prioritize files — configs first, then source by size
-    const configs = allFiles.filter((f) => CONFIG_FILES.includes(f.name))
-    const source = allFiles
-      .filter((f) => !CONFIG_FILES.includes(f.name))
-      .sort((a, b) => b.size - a.size) // Larger files first (more to scan)
+    // ── MODE: selected files ───────────────────────────────────────────────────
+    // Fetches only the paths provided in the `files` array.
+    if (files && Array.isArray(files) && files.length > 0) {
+      const filesToFetch = files.map((path) => ({
+        name: path.split("/").pop(),
+        path,
+        full_path: `${parsed.owner}/${parsed.repo}/contents/${path}`,
+      }))
 
-    const selected = [...configs, ...source].slice(0, MAX_FILES)
+      const fetched = []
+      for (const item of filesToFetch) {
+        const content = await fetchFileContent(item, token)
+        if (content) {
+          fetched.push({ path: item.path, content })
+        }
+      }
 
-    // Step 4: Fetch file contents
-    const files = []
+      if (fetched.length === 0) {
+        return res.status(404).json({ error: "Could not fetch any of the selected files" })
+      }
+
+      const combined = fetched
+        .map((f) => `// === ${f.path} ===\n${f.content}`)
+        .join("\n\n")
+
+      return res.status(200).json({
+        repo: {
+          name: repo.full_name,
+          description: repo.description,
+          language: repo.language,
+          stars: repo.stargazers_count,
+          url: repo.html_url,
+        },
+        files: fetched.map((f) => f.path),
+        fileCount: fetched.length,
+        totalLines: combined.split("\n").length,
+        code: combined,
+      })
+    }
+
+    // ── MODE: default (auto-select + fetch all) ────────────────────────────────
+    const allFiles = await collectAllFiles(parsed.owner, parsed.repo, token)
+    const selected = selectFiles(allFiles)
+
+    // Fetch file contents
+    const fetchedFiles = []
     for (const item of selected) {
       const content = await fetchFileContent(item, token)
       if (content) {
-        files.push({ path: item.path, content })
+        fetchedFiles.push({ path: item.path, content })
       }
     }
 
-    if (files.length === 0) {
+    if (fetchedFiles.length === 0) {
       return res.status(404).json({ error: "No scannable source files found in this repo" })
     }
 
-    // Step 5: Combine into a single code block for scanning
-    const combined = files
+    const combined = fetchedFiles
       .map((f) => `// === ${f.path} ===\n${f.content}`)
       .join("\n\n")
 
@@ -175,8 +268,8 @@ export default async function handler(req, res) {
         stars: repo.stargazers_count,
         url: repo.html_url,
       },
-      files: files.map((f) => f.path),
-      fileCount: files.length,
+      files: fetchedFiles.map((f) => f.path),
+      fileCount: fetchedFiles.length,
       totalLines: combined.split("\n").length,
       code: combined,
     })

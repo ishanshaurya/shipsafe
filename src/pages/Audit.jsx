@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { Link } from "react-router-dom"
-import { Search, Play, Loader2, AlertTriangle, CheckCircle, ChevronDown, ChevronRight, FileCode, Shield, Zap, TestTube, Lock, PackageCheck, Sparkles, Github, Star } from "lucide-react"
+import { Search, Play, Loader2, AlertTriangle, CheckCircle, ChevronDown, ChevronRight, FileCode, Shield, Zap, TestTube, Lock, PackageCheck, Sparkles, Github, Star, File } from "lucide-react"
 import { saveScan } from "../services/supabaseService"
 import { extractScore } from "../services/scanService"
 import { useAuth } from "../hooks/useAuth"
@@ -241,12 +241,26 @@ export default function Audit() {
   const [githubLoading, setGithubLoading] = useState(false)
   const [githubInfo, setGithubInfo] = useState(null)
   const [githubError, setGithubError] = useState(null)
+  // File picker state
+  const [fileList, setFileList] = useState(null)
+  const [selectedFiles, setSelectedFiles] = useState([])
+  const [filePickRepo, setFilePickRepo] = useState(null)
 
   const toggle = (id) => setExp(p => ({ ...p, [id]: !p[id] }))
 
+  const formatSize = (bytes) => {
+    if (bytes < 1024) return `${bytes} B`
+    return `${(bytes / 1024).toFixed(1)} KB`
+  }
+
+  const totalSelectedSize = fileList
+    ? fileList.filter(f => selectedFiles.includes(f.path)).reduce((s, f) => s + f.size, 0)
+    : 0
+
+  // Quick scan: one-step auto-select + fetch + auto-audit
   const fetchFromGitHub = async () => {
     if (!githubUrl.trim() || githubLoading) return
-    setGithubLoading(true); setGithubError(null); setGithubInfo(null)
+    setGithubLoading(true); setGithubError(null); setGithubInfo(null); setFileList(null)
     try {
       const res = await fetch("/api/github", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: githubUrl.trim() }) })
       const data = await res.json()
@@ -256,6 +270,52 @@ export default function Audit() {
       setResult(null); setExp({})
       setGithubLoading(false)
       // Auto-run audit after fetching
+      setTimeout(() => runAuditWithCode(data.code), 50)
+    } catch {
+      setGithubError("Network error — could not reach GitHub")
+      setGithubLoading(false)
+    }
+  }
+
+  // Step 1: Fetch file tree only (list mode)
+  const fetchFileList = async () => {
+    if (!githubUrl.trim() || githubLoading) return
+    setGithubLoading(true); setGithubError(null); setGithubInfo(null); setFileList(null)
+    try {
+      const res = await fetch("/api/github", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: githubUrl.trim(), mode: "list" }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setGithubError(data.error || "Failed to fetch repo"); return }
+      setFileList(data.files)
+      setFilePickRepo(data.repo)
+      setSelectedFiles(data.files.filter(f => f.autoSelected).map(f => f.path))
+    } catch {
+      setGithubError("Network error — could not reach GitHub")
+    } finally {
+      setGithubLoading(false)
+    }
+  }
+
+  // Step 3: Fetch only selected files then auto-audit
+  const fetchSelectedFiles = async () => {
+    if (!selectedFiles.length || githubLoading) return
+    setGithubLoading(true); setGithubError(null)
+    try {
+      const res = await fetch("/api/github", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: githubUrl.trim(), files: selectedFiles }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setGithubError(data.error || "Failed to fetch files"); return }
+      setCode(data.code)
+      setGithubInfo(data)
+      setFileList(null)
+      setResult(null); setExp({})
+      setGithubLoading(false)
       setTimeout(() => runAuditWithCode(data.code), 50)
     } catch {
       setGithubError("Network error — could not reach GitHub")
@@ -323,32 +383,111 @@ export default function Audit() {
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16, alignItems: "start" }}>
         {/* LEFT — Input */}
         <div>
-          {/* GitHub fetch */}
+          {/* GitHub fetch — two-step file picker */}
           <div style={{ marginBottom: 10 }}>
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            {/* URL input row */}
+            <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: fileList ? 8 : 0 }}>
               <div style={{ display: "flex", alignItems: "center", flex: 1, background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 7, overflow: "hidden" }}>
                 <div style={{ padding: "0 10px", borderRight: "1px solid rgba(255,255,255,0.06)", display: "flex", alignItems: "center" }}>
                   <Github size={13} color="rgba(255,255,255,0.25)" />
                 </div>
                 <input
                   value={githubUrl}
-                  onChange={e => { setGithubUrl(e.target.value); setGithubError(null) }}
-                  onKeyDown={e => e.key === "Enter" && fetchFromGitHub()}
-                  placeholder="Paste GitHub repo URL to auto-scan"
+                  onChange={e => { setGithubUrl(e.target.value); setGithubError(null); setFileList(null) }}
+                  onKeyDown={e => e.key === "Enter" && fetchFileList()}
+                  placeholder="Paste GitHub repo URL…"
                   style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: "rgba(255,255,255,0.7)", fontSize: 12, padding: "8px 10px", fontFamily: "inherit" }}
                 />
               </div>
-              <button onClick={fetchFromGitHub} disabled={githubLoading || !githubUrl.trim()} style={{ background: githubLoading || !githubUrl.trim() ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 7, color: githubLoading || !githubUrl.trim() ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.7)", fontSize: 12, padding: "8px 14px", cursor: githubLoading || !githubUrl.trim() ? "not-allowed" : "pointer", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit" }}>
-                {githubLoading ? <><Loader2 size={11} style={{ animation: "spin 1s linear infinite" }} /> Fetching...</> : "Fetch & Audit"}
+              {/* Fetch Files — step 1 */}
+              <button
+                onClick={fetchFileList}
+                disabled={githubLoading || !githubUrl.trim()}
+                style={{ background: githubLoading || !githubUrl.trim() ? "rgba(255,255,255,0.04)" : "rgba(249,115,22,0.08)", border: `1px solid ${githubLoading || !githubUrl.trim() ? "rgba(255,255,255,0.08)" : "rgba(249,115,22,0.2)"}`, borderRadius: 7, color: githubLoading || !githubUrl.trim() ? "rgba(255,255,255,0.2)" : "#f97316", fontSize: 12, padding: "8px 12px", cursor: githubLoading || !githubUrl.trim() ? "not-allowed" : "pointer", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 5, fontFamily: "inherit" }}>
+                {githubLoading && !fileList ? <><Loader2 size={11} style={{ animation: "spin 1s linear infinite" }} /> Loading…</> : <><FileCode size={11} /> Fetch Files</>}
+              </button>
+              {/* Quick Scan — old one-step flow */}
+              <button
+                onClick={fetchFromGitHub}
+                disabled={githubLoading || !githubUrl.trim()}
+                title="Auto-select & audit in one step"
+                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 7, color: githubLoading || !githubUrl.trim() ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.5)", fontSize: 12, padding: "8px 12px", cursor: githubLoading || !githubUrl.trim() ? "not-allowed" : "pointer", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 5, fontFamily: "inherit" }}>
+                <Zap size={11} /> Quick
               </button>
             </div>
+
+            {/* File picker panel — step 2 */}
+            {fileList && (
+              <div style={{ background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, overflow: "hidden" }}>
+                {/* Picker header */}
+                <div style={{ padding: "10px 14px", borderBottom: "1px solid rgba(255,255,255,0.06)", display: "flex", alignItems: "center", gap: 10 }}>
+                  <Github size={12} color="rgba(255,255,255,0.3)" />
+                  <span style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", flex: 1, fontWeight: 500 }}>
+                    {filePickRepo?.name} <span style={{ color: "rgba(255,255,255,0.25)", fontWeight: 400 }}>— {fileList.length} files found</span>
+                  </span>
+                  <button
+                    onClick={() => setSelectedFiles(fileList.filter(f => f.autoSelected).map(f => f.path))}
+                    style={{ background: "rgba(249,115,22,0.06)", border: "1px solid rgba(249,115,22,0.15)", borderRadius: 5, color: "#f97316", fontSize: 10, padding: "3px 9px", cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+                    Auto-select recommended
+                  </button>
+                  <button
+                    onClick={() => selectedFiles.length === fileList.length ? setSelectedFiles([]) : setSelectedFiles(fileList.map(f => f.path))}
+                    style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 5, color: "rgba(255,255,255,0.4)", fontSize: 10, padding: "3px 9px", cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+                    {selectedFiles.length === fileList.length ? "Deselect All" : "Select All"}
+                  </button>
+                </div>
+
+                {/* File list */}
+                <div style={{ maxHeight: 220, overflowY: "auto" }}>
+                  {fileList.map(f => {
+                    const checked = selectedFiles.includes(f.path)
+                    return (
+                      <label key={f.path} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 14px", cursor: "pointer", borderBottom: "1px solid rgba(255,255,255,0.03)", background: checked ? "rgba(249,115,22,0.03)" : "transparent" }}>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => setSelectedFiles(p => checked ? p.filter(x => x !== f.path) : [...p, f.path])}
+                          style={{ accentColor: "#f97316", width: 13, height: 13, flexShrink: 0 }}
+                        />
+                        <FileCode size={11} color={checked ? "#f97316" : "rgba(255,255,255,0.2)"} style={{ flexShrink: 0 }} />
+                        <span style={{ flex: 1, fontFamily: "monospace", fontSize: 11, color: checked ? "rgba(255,255,255,0.75)" : "rgba(255,255,255,0.35)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {f.path}
+                        </span>
+                        {f.autoSelected && <span style={{ fontSize: 9, color: "rgba(249,115,22,0.7)", background: "rgba(249,115,22,0.06)", padding: "1px 5px", borderRadius: 3, flexShrink: 0 }}>rec</span>}
+                        <span style={{ fontSize: 10, color: "rgba(255,255,255,0.2)", flexShrink: 0, fontFamily: "monospace" }}>{formatSize(f.size)}</span>
+                      </label>
+                    )
+                  })}
+                </div>
+
+                {/* Picker footer */}
+                <div style={{ padding: "10px 14px", borderTop: "1px solid rgba(255,255,255,0.06)", display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", flex: 1 }}>
+                    Selected: <span style={{ color: "rgba(255,255,255,0.6)", fontWeight: 600 }}>{selectedFiles.length} files</span>
+                    {totalSelectedSize > 0 && <span style={{ color: "rgba(255,255,255,0.25)" }}> ({formatSize(totalSelectedSize)})</span>}
+                  </span>
+                  <button
+                    onClick={() => setFileList(null)}
+                    style={{ background: "transparent", border: "none", color: "rgba(255,255,255,0.25)", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+                    Cancel
+                  </button>
+                  <button
+                    onClick={fetchSelectedFiles}
+                    disabled={!selectedFiles.length || githubLoading}
+                    style={{ background: !selectedFiles.length || githubLoading ? "rgba(255,255,255,0.04)" : "#f97316", border: "none", borderRadius: 7, color: !selectedFiles.length || githubLoading ? "rgba(255,255,255,0.2)" : "#000", fontSize: 12, fontWeight: 700, padding: "7px 16px", cursor: !selectedFiles.length || githubLoading ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 5, fontFamily: "inherit" }}>
+                    {githubLoading ? <><Loader2 size={11} style={{ animation: "spin 1s linear infinite" }} /> Fetching…</> : "Audit Selected Files →"}
+                  </button>
+                </div>
+              </div>
+            )}
+
             {githubError && (
               <div style={{ marginTop: 6, padding: "8px 12px", borderRadius: 7, background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.15)", display: "flex", alignItems: "center", gap: 8, justifyContent: "space-between" }}>
                 <span style={{ fontSize: 11, color: "#ef4444" }}>{githubError}</span>
                 <button onClick={() => setGithubError(null)} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.25)", cursor: "pointer", fontSize: 14, lineHeight: 1 }}>×</button>
               </div>
             )}
-            {githubInfo && (
+            {githubInfo && !fileList && (
               <div style={{ marginTop: 6, padding: "8px 12px", borderRadius: 7, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", display: "flex", alignItems: "center", gap: 8 }}>
                 <Github size={11} color="rgba(255,255,255,0.3)" />
                 <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", flex: 1 }}>Fetched {githubInfo.fileCount} files ({githubInfo.totalLines} lines) from <span style={{ color: "rgba(255,255,255,0.7)" }}>{githubInfo.repo.name}</span></span>
