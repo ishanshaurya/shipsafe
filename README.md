@@ -1,4 +1,4 @@
-# 🛡 ShipSafe
+# ShipSafe
 
 **Build, Validate & Deploy AI Responsibly**
 
@@ -6,7 +6,7 @@
 
 ShipSafe is an all-in-one developer toolkit for building, validating, and deploying AI projects responsibly. Every feature answers one of three core questions in a developer's deployment pipeline: **Is my code safe?** → **Is my project legal?** → **Am I ready to ship?**
 
-🔗 **Live Demo:** [shipsafe-app.vercel.app](https://shipsafe-app.vercel.app)
+**Live Demo:** [shipsafe-app.vercel.app](https://shipsafe-app.vercel.app)
 
 ---
 
@@ -21,32 +21,32 @@ ShipSafe is an all-in-one developer toolkit for building, validating, and deploy
 
 ## Features
 
-### 🐛 AI Code Debugger
+### AI Code Debugger
 Paste any code and get an instant AI analysis covering bugs, security vulnerabilities, and **vibe-code smells** — patterns unique to AI-generated code that real developers wouldn't write (hardcoded secrets, no error handling, hallucinated imports, console.log everywhere).
 
 <!-- ![AI Debugger Screenshot](screenshots/debugger.png) -->
 
-### 🔍 Vibe-Code Audit
+### Vibe-Code Audit
 Goes beyond single-file debugging. Paste your entire project structure and get a **scored report card** across 5 categories: Security, Code Quality, Maintainability, AI-Pattern Detection, and Deployment Readiness.
 
 <!-- ![Vibe-Code Audit Screenshot](screenshots/audit.png) -->
 
-### 🔑 Loophole Finder
+### Loophole Finder
 Describe your AI system and select target deployment countries. The AI cross-references regulation databases to find **legal grey areas** — where the law is ambiguous, enforcement is unclear, or competitors might exploit gaps. References real regulations: EU AI Act, India's DPDP Act, US Executive Order on AI, and more.
 
 <!-- ![Loophole Finder Screenshot](screenshots/loopholes.png) -->
 
-### 🚀 Deploy Readiness Checker
+### Deploy Readiness Checker
 The final gate before shipping. Describe your deployment setup and the AI checks for common production gotchas: missing env vars, CORS misconfig, no rate limiting, missing security headers, and platform-specific issues for Vercel, Netlify, AWS, Railway, and more.
 
 <!-- ![Deploy Checker Screenshot](screenshots/deploy-check.png) -->
 
-### ⚡ Stress Tester
+### Stress Tester
 A simulated load testing tool. Describe your stack and the AI predicts bottlenecks at 10, 100, 1,000, and 10,000 concurrent users — identifying which component breaks first and what the fix is. Includes realistic analysis of free-tier limits (Vercel, Supabase, etc.).
 
 <!-- ![Stress Tester Screenshot](screenshots/stress-test.png) -->
 
-### 📊 Dashboard
+### Dashboard
 Track all your scans in one place. Shows scan history, scores, issue counts, and quick actions to every tool. Logged-in users get persistent scan history via Supabase.
 
 <!-- ![Dashboard Screenshot](screenshots/dashboard.png) -->
@@ -120,7 +120,7 @@ GEMINI_API_KEY=your_gemini_key
 GROQ_API_KEY=your_groq_key          # optional fallback
 ```
 
-> ⚠️ **Note:** `GEMINI_API_KEY` and `GROQ_API_KEY` have no `VITE_` prefix — they run server-side only and are never exposed to the browser.
+> **Note:** `GEMINI_API_KEY` and `GROQ_API_KEY` have no `VITE_` prefix — they run server-side only and are never exposed to the browser.
 
 ### Run locally
 
