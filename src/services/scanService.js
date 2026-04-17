@@ -166,6 +166,8 @@ Rules:
 - weakPoints: max 5. recommendations: max 4.
 - Be honest that this is AI-predicted, not real load testing.
 - Respond ONLY with the JSON object.`,
+
+  regulations: `You are a global AI regulation expert. Return ONLY valid JSON, no markdown, no backticks, no explanation. Only include regulations you are confident are real. If unsure, omit it. Return maximum 4 regulations. Each summary max 2 sentences. Checklist max 4 items. Checklist items must be actionable and testable (e.g. 'Add watermark to AI-generated media'), never generic advice like 'ensure compliance'.`,
 }
 
 // ─────────────────────────────────────────────
@@ -471,47 +473,30 @@ function normalizeRegulation(r) {
   }
 }
 
-const REGULATIONS_SYSTEM_PROMPT = `You are a global AI regulation expert. Return ONLY valid JSON, no markdown, no backticks, no explanation. Only include regulations you are confident are real. If unsure, omit it. Return maximum 4 regulations. Each summary max 2 sentences. Checklist max 4 items. Checklist items must be actionable and testable (e.g. 'Add watermark to AI-generated media'), never generic advice like 'ensure compliance'.`
-
-/**
- * Fetch regulations relevant to a topic via AI.
- * Results are cached in-memory for the session.
- *
- * @param {string} topic - e.g. "facial recognition", "healthcare AI", "EU"
- * @returns {Array} normalized regulation objects (falls back to MOCK_REGULATIONS on any error)
- */
 export async function fetchRegulations(topic) {
-  const key = topic.trim().toLowerCase()
+  const key = topic.toLowerCase().trim()
+  if (_regulationsCache.has(key)) return _regulationsCache.get(key)
 
-  if (_regulationsCache.has(key)) {
-    return _regulationsCache.get(key)
-  }
+  const userPrompt = `Topic: ${topic}
 
-  try {
-    const response = await fetch("/api/claude", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        tool: "regulations",
-        systemPrompt: REGULATIONS_SYSTEM_PROMPT,
-        userPrompt: `Return regulations for this topic as JSON matching this exact shape:
+Return JSON matching this exact shape:
 {
-  "topic": "<topic>",
+  "topic": "${topic}",
   "regulations": [
     {
       "name": string,
       "country": string,
       "year": number | null,
       "status": "Active" | "Draft" | "Proposed" | "Repealed" | "Unknown",
-      "summary": string (max 2 sentences),
-      "source_url": string (real URL or omit),
+      "summary": string,
+      "source_url": string,
       "sectors": string[],
       "risk": {
         "description": string,
         "severity": "High" | "Medium" | "Low",
         "who_is_at_risk": string[]
       },
-      "developer_checklist": string[] (max 4 items, actionable)
+      "developer_checklist": string[]
     }
   ],
   "country_coverage": {
@@ -520,54 +505,39 @@ export async function fetchRegulations(topic) {
     "unregulated": string[]
   },
   "overall_severity": "High" | "Medium" | "Low"
-}
+}`
 
-Topic: ${topic}`,
-      }),
+  try {
+    const response = await fetch("/api/claude", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tool: "regulations", userPrompt, systemPrompt: SYSTEM_PROMPTS.regulations }),
     })
 
-    if (!response.ok) {
-      console.error("[scanService] fetchRegulations server error:", response.status)
-      return mockRegulationResult
-    }
+    if (!response.ok) throw new Error(`Server error: ${response.status}`)
 
     const data = await response.json()
     let raw = (data.content || "").replace(/```json\s*/g, "").replace(/```\s*/g, "").trim()
+    const parsed = JSON.parse(raw)
 
-    let parsed
-    try {
-      parsed = JSON.parse(raw)
-    } catch {
-      console.error("[scanService] fetchRegulations JSON parse failed:", raw.slice(0, 300))
-      return mockRegulationResult
-    }
-
-    // Accept both envelope shape { regulations: [...] } and bare array (graceful fallback)
-    const rawRegs = Array.isArray(parsed) ? parsed : (Array.isArray(parsed.regulations) ? parsed.regulations : null)
-    if (!rawRegs) {
-      console.error("[scanService] fetchRegulations: no regulations array in response")
-      return mockRegulationResult
-    }
-
-    // Deduplicate by name, normalize every item
+    const regsArray = Array.isArray(parsed) ? parsed : (parsed.regulations || [])
     const seen = new Map()
-    for (const item of rawRegs) {
-      const nameKey = (item.name || "").trim().toLowerCase()
-      if (nameKey && !seen.has(nameKey)) {
-        seen.set(nameKey, normalizeRegulation(item))
-      }
-    }
+    regsArray.forEach(r => {
+      const nameKey = (r.name || "").toLowerCase()
+      if (nameKey && !seen.has(nameKey)) seen.set(nameKey, normalizeRegulation(r))
+    })
 
     const result = {
       regulations: Array.from(seen.values()),
       country_coverage: parsed.country_coverage ?? null,
       overall_severity: parsed.overall_severity ?? null,
     }
+
     _regulationsCache.set(key, result)
     return result
 
   } catch (err) {
-    console.error("[scanService] fetchRegulations threw:", err)
+    console.error("[scanService] fetchRegulations failed:", err)
     return mockRegulationResult
   }
 }
