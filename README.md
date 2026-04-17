@@ -36,6 +36,9 @@ Describe your AI system and select target deployment countries. The AI cross-ref
 
 <!-- ![Loophole Finder Screenshot](screenshots/loopholes.png) -->
 
+### Regulation Explorer
+Topic-driven global regulation explorer. Pick a topic (Privacy, Deepfakes, Bias, etc.) and get AI-surfaced regulations, real-world risks, country coverage, and a developer checklist. Powered by Gemini 2.5 Flash.
+
 ### Deploy Readiness Checker
 The final gate before shipping. Describe your deployment setup and the AI checks for common production gotchas: missing env vars, CORS misconfig, no rate limiting, missing security headers, and platform-specific issues for Vercel, Netlify, AWS, Railway, and more.
 
@@ -82,6 +85,7 @@ Track all your scans in one place. Shows scan history, scores, issue counts, and
 - **Serverless proxy pattern** — React calls `/api/claude`, the serverless function adds the API key and forwards to Gemini. API keys never appear in frontend code.
 - **Service layer** — `scanService.js` centralizes all AI calls. One function (`callAI`) handles prompt building, fetching, JSON parsing, and validation for all 5 tools.
 - **Row Level Security** — Supabase RLS ensures users can only see their own scan history.
+- **Regulations page** — uses live Gemini queries with in-memory caching and schema normalization — no static database.
 
 ---
 
@@ -211,7 +215,7 @@ All tables use **Row Level Security (RLS)** — users can only access their own 
 - [ ] Groq fallback API
 - [ ] Public shareable reports (/report/:id)
 - [ ] PDF export for reports
-- [ ] Real regulation data API integration
+- [x] Real regulation data API integration
 - [x] Rate limiting on AI proxy
 
 ---
