@@ -1,7 +1,7 @@
 // NOTE: in-memory rate limiter resets on cold starts. Replace with Redis/Upstash for persistent limiting at scale.
 const rateLimitStore = new Map()
 
-const ALLOWED_TOOLS = new Set(["debugger", "audit", "loopholes", "deploy-check", "stress-test"])
+const ALLOWED_TOOLS = new Set(["debugger", "audit", "loopholes", "deploy-check", "stress-test", "regulations"])
 
 const SYSTEM_PROMPTS = {
   debugger: `You are ShipSafe AI Debugger — an expert code reviewer that finds bugs, security vulnerabilities, and "vibe-code" smells.
@@ -121,6 +121,8 @@ Rules:
 - criticalBlockers: only items that WILL cause production failures.
 - readinessScore: 90-100 ship it, 70-89 minor fixes, 40-69 needs work, 0-39 not ready.
 - Respond ONLY with the JSON object.`,
+
+  regulations: `You are a global AI regulation expert. Return ONLY valid JSON, no markdown, no backticks, no explanation. Only include regulations you are confident are real. If unsure, omit it. Return maximum 4 regulations. Each summary max 2 sentences. Checklist max 4 items. Checklist items must be actionable and testable (e.g. 'Add watermark to AI-generated media'), never generic advice like 'ensure compliance'.`,
 
   "stress-test": `You are ShipSafe Stress Tester — you predict bottlenecks and failure points in a described architecture under load.
 
