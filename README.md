@@ -211,12 +211,12 @@ All tables use **Row Level Security (RLS)** — users can only access their own 
 - [x] Stress Tester with tier-based predictions
 - [x] Supabase Auth (email + GitHub)
 - [x] Scan history dashboard
-- [x] Mobile responsive
+- [x] Public shareable reports (/report/:id)
+- [ ] Mobile responsive (in progress)
 - [ ] Groq fallback API
-- [ ] Public shareable reports (/report/:id)
+- [ ] Rate limiting on AI proxy
 - [ ] PDF export for reports
-- [x] Real regulation data API integration
-- [x] Rate limiting on AI proxy
+- [ ] Real regulation data API integration
 
 ---
 
