@@ -7,10 +7,10 @@ import { useIsMobile } from '../hooks/useIsMobile'
 
 const NAV = [
   { path: '/dashboard',    label: 'Dashboard',       icon: LayoutDashboard },
-  { path: '/debugger',     label: 'AI Debugger',     icon: Bug,             tag: 'AI' },
-  { path: '/audit',        label: 'Vibe-Code Audit', icon: Search,          tag: 'AI' },
+  { path: '/debugger',     label: 'AI Debugger',     icon: Bug },
+  { path: '/audit',        label: 'Vibe-Code Audit', icon: Search },
   { path: '/regulations',  label: 'Regulations',     icon: Scale },
-  { path: '/loopholes',    label: 'Loopholes',       icon: KeyRound,        tag: 'AI' },
+  { path: '/loopholes',    label: 'Loopholes',       icon: KeyRound },
   { path: '/deploy-check', label: 'Deploy Check',    icon: Rocket },
   { path: '/stress-test',  label: 'Stress Test',     icon: FlaskConical },
 ]
@@ -71,11 +71,6 @@ export default function Layout() {
               <NavLink key={item.path} to={item.path} className={`nav-item ${isActive ? 'active' : ''}`}>
                 <Icon size={15} style={{ flexShrink:0 }} />
                 <span style={{ flex:1 }}>{item.label}</span>
-                {item.tag && (
-                  <span style={{ fontSize:9, fontWeight:700, color:'#34d399', background:'rgba(52,211,153,0.1)', padding:'2px 6px', borderRadius:4, letterSpacing:'0.06em' }}>
-                    {item.tag}
-                  </span>
-                )}
               </NavLink>
             )
           })}
