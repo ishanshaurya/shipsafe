@@ -1,301 +1,589 @@
-import { useState } from "react"
-import { Link } from "react-router-dom"
-import { FlaskConical, Play, Loader2, AlertTriangle, CheckCircle, Users, Server, Database, Wifi, Zap, Clock } from "lucide-react"
-import { saveScan } from "../services/supabaseService"
-import { extractScore } from "../services/scanService"
-import { useAuth } from "../hooks/useAuth"
-import { useIsMobile } from "../hooks/useIsMobile"
-import ReportButton from "../components/ReportButton"
-import NextSteps from "../components/NextSteps"
-import { getSuggestions } from "../utils/crossToolSuggestions"
+import React, { useState, useRef, useEffect } from 'react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area } from 'recharts';
+import { AlertCircle, Zap, TrendingUp, Clock, Activity } from 'lucide-react';
 
-/* ═══════════════════════════════════════════════════════════
-   STRESS TESTER — ShipSafe Stage 3
+const StressTest = () => {
+  const [deployUrl, setDeployUrl] = useState('');
+  const [endpoint, setEndpoint] = useState('/');
+  const [architecture, setArchitecture] = useState('');
+  const [maxConcurrent, setMaxConcurrent] = useState(1000);
+  const [httpMethod, setHttpMethod] = useState('GET');
+  const [requestBody, setRequestBody] = useState('');
 
-   AI-powered predictive load analysis. Developer describes
-   their stack, and we simulate what happens at 10, 100,
-   1000, and 10000 concurrent users.
+  const [isRunning, setIsRunning] = useState(false);
+  const [results, setResults] = useState(null);
+  const [error, setError] = useState('');
+  const [progress, setProgress] = useState(0);
 
-   Honest note in UI: this is simulated/predictive, not
-   real load testing.
-   ═══════════════════════════════════════════════════════════ */
+  const chartDataRef = useRef([]);
 
-const SAMPLE_STACK = `Frontend: Vercel (React/Next.js)
-Backend: Vercel Serverless Functions
-Database: Supabase PostgreSQL (free tier)
-  - Connection limit: 60
-  - Pool size: 15
-AI API: Claude API via serverless proxy
-  - ~2 seconds per request
-  - No caching
-Auth: Supabase Auth
-  - Session-based
-Storage: Supabase Storage (1GB free)
-CDN: Vercel Edge Network`
-
-const TIERS = [
-  { users: 10, label: "10 users", desc: "Small team / Demo" },
-  { users: 100, label: "100 users", desc: "Beta launch" },
-  { users: 1000, label: "1K users", desc: "Product launch" },
-  { users: 10000, label: "10K users", desc: "Viral growth" },
-]
-
-function getMockStressTest(stack) {
-  const stackLower = stack.toLowerCase()
-  const hasSupabase = stackLower.includes("supabase")
-  const hasVercel = stackLower.includes("vercel")
-  const hasAI = stackLower.includes("claude") || stackLower.includes("openai") || stackLower.includes("ai api")
-  const hasCache = stackLower.includes("cache") || stackLower.includes("redis")
-  const hasCDN = stackLower.includes("cdn") || stackLower.includes("edge")
-
-  const tiers = [
-    {
-      users: 10, status: "green", responseTime: "120ms", label: "SAFE",
-      components: [
-        { name: "Frontend", status: "green", detail: hasCDN ? "CDN serving static assets — no issues" : "Static files served directly, fine at this scale" },
-        { name: "API", status: "green", detail: hasVercel ? "Serverless cold starts ~200ms, warm ~50ms. No issues." : "Server handles 10 concurrent requests easily." },
-        { name: "Database", status: "green", detail: hasSupabase ? "Supabase: 10 connections of 60 limit (17% utilization)" : "Database connections well within limits." },
-        ...(hasAI ? [{ name: "AI API", status: "green", detail: "10 concurrent AI calls — ~2s response each. No rate limit issues." }] : []),
-      ],
-      bottleneck: null,
-    },
-    {
-      users: 100, status: "yellow", responseTime: "450ms", label: "CAUTION",
-      components: [
-        { name: "Frontend", status: "green", detail: hasCDN ? "CDN handles static assets perfectly at this scale." : "May need CDN — 100 concurrent asset requests adds latency." },
-        { name: "API", status: "yellow", detail: hasVercel ? "Vercel free tier: 100 concurrent serverless functions possible but cold starts increase. Avg response 400ms." : "Server may need horizontal scaling. Queue forming." },
-        { name: "Database", status: "yellow", detail: hasSupabase ? "Supabase free tier: connection pool (15) starts queuing. 100 users hitting DB simultaneously = waiting." : "Connection pool pressure starting. Queries may queue." },
-        ...(hasAI ? [{ name: "AI API", status: "red", detail: "100 concurrent AI calls = $$ per minute. Claude rate limits may throttle. Need request queuing and caching." }] : []),
-      ],
-      bottleneck: hasAI ? "AI API rate limits and cost" : "Database connection pooling",
-    },
-    {
-      users: 1000, status: "red", responseTime: "2.8s", label: "BREAKING",
-      components: [
-        { name: "Frontend", status: "green", detail: hasCDN ? "CDN scales horizontally. No frontend issues." : "Without CDN, origin server overwhelmed. Add Cloudflare or Vercel Edge." },
-        { name: "API", status: "red", detail: hasVercel ? "Vercel free tier: 100K invocations/month = exhausted in ~4 days at this rate. Need Pro plan ($20/mo)." : "Server needs load balancer + multiple instances." },
-        { name: "Database", status: "red", detail: hasSupabase ? "Supabase free tier collapses: 60 connection limit hit, queries timeout, data inconsistency risk. Need Pro plan or PgBouncer." : "Database is the bottleneck. Connection pool exhausted. Queries failing." },
-        ...(hasAI ? [{ name: "AI API", status: "red", detail: "1000 AI calls/min = ~$15/hour with Claude. Rate limits hit. Need aggressive caching, request batching, and queue system." }] : []),
-      ],
-      bottleneck: hasSupabase ? "Supabase free tier connection limit (60)" : "Database connections",
-    },
-    {
-      users: 10000, status: "red", responseTime: "Timeout", label: "FAILURE",
-      components: [
-        { name: "Frontend", status: hasCDN ? "green" : "red", detail: hasCDN ? "CDN handles 10K static requests fine." : "Origin server completely overwhelmed. Pages fail to load." },
-        { name: "API", status: "red", detail: "Any free tier is exhausted. Need dedicated infrastructure: load balancer, auto-scaling, queue system (BullMQ/SQS)." },
-        { name: "Database", status: "red", detail: hasSupabase ? "Supabase needs Pro + connection pooler + read replicas. Free tier handles ~50 concurrent queries max." : "Need read replicas, connection pooler, and query optimization." },
-        ...(hasAI ? [{ name: "AI API", status: "red", detail: "Unsustainable without caching. Cache common queries (90% hit rate can reduce AI calls 10x). Budget: ~$150/hour without caching." }] : []),
-      ],
-      bottleneck: "Everything — need full architecture review for this scale",
-    },
-  ]
-
-  const recommendations = [
-    ...(hasAI && !hasCache ? ["Add Redis caching for AI responses — most queries are similar. 90% cache hit rate reduces AI costs 10x."] : []),
-    ...(hasSupabase ? ["Switch to Supabase connection pooler (port 6543) to handle more concurrent connections."] : []),
-    ...(hasVercel ? ["Add Vercel Edge Middleware for rate limiting before requests hit serverless functions."] : []),
-    ...(!hasCDN ? ["Add CDN (Cloudflare free tier) for static assets to reduce origin server load."] : []),
-    "Implement request queuing for AI calls — process in order instead of all at once.",
-    "Add database query caching with a short TTL (60s) for read-heavy endpoints.",
-    "Set up auto-scaling triggers: CPU > 70%, memory > 80%, response time > 2s.",
-  ]
-
-  return { tiers, recommendations, stack: stackLower }
-}
-
-const STATUS_COLOR = { green: "#34d399", yellow: "#eab308", red: "#ef4444" }
-
-export default function StressTest() {
-  const { user } = useAuth()
-  const isMobile = useIsMobile()
-  const [stack, setStack] = useState("")
-  const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState(null)
-  const [suggestions, setSuggestions] = useState([])
-
-  const runTest = async () => {
-    if (!stack.trim() || loading) return
-    setLoading(true); setResult(null); setSuggestions([])
-    await new Promise(r => setTimeout(r, 2000 + Math.random() * 1000))
-    const stressResult = getMockStressTest(stack)
-    setResult(stressResult)
-    setSuggestions(getSuggestions("stress-test", stressResult))
-    if (user) {
-      saveScan(user.id, "stress-test", stack.slice(0, 500), stressResult, extractScore("stress-test", stressResult))
-        .then(({ error }) => { if (error) console.error("Failed to save scan:", error.message) })
+  // Validate URL
+  const validateUrl = (url) => {
+    try {
+      new URL(url);
+      return true;
+    } catch {
+      return false;
     }
-    setLoading(false)
-  }
+  };
+
+  // Simulate concurrent HTTP requests
+  const simulateConcurrentRequests = async (url, count) => {
+    const results = [];
+    const startTime = Date.now();
+
+    // Create request promises for concurrent execution
+    const requests = Array(count)
+      .fill(null)
+      .map((_, i) =>
+        fetch(url, {
+          method: httpMethod,
+          headers: { 'Content-Type': 'application/json' },
+          body: httpMethod !== 'GET' ? requestBody : undefined,
+        })
+          .then((res) => ({
+            success: true,
+            status: res.status,
+            time: Date.now() - startTime,
+            index: i,
+          }))
+          .catch((err) => ({
+            success: false,
+            error: err.message,
+            time: Date.now() - startTime,
+            index: i,
+          }))
+      );
+
+    // Execute all in parallel
+    const responses = await Promise.all(requests);
+    return responses.sort((a, b) => a.time - b.time);
+  };
+
+  // Run stress test with increasing load tiers
+  const runStressTest = async () => {
+    if (!deployUrl.trim()) {
+      setError('Please enter your deployment URL');
+      return;
+    }
+
+    if (!validateUrl(deployUrl)) {
+      setError('Invalid URL. Must include https://');
+      return;
+    }
+
+    setIsRunning(true);
+    setError('');
+    setResults(null);
+    chartDataRef.current = [];
+
+    try {
+      const baseUrl = deployUrl.endsWith('/') ? deployUrl : deployUrl + '/';
+      const fullUrl = baseUrl + endpoint.replace(/^\//, '');
+
+      // Load tiers to test
+      const tiers = [10, 100, 500, 1000].filter((t) => t <= maxConcurrent);
+      const allResults = {
+        tiers: [],
+        chartData: [],
+        overall: {
+          totalRequests: 0,
+          successCount: 0,
+          errorCount: 0,
+          avgLatency: 0,
+          maxLatency: 0,
+          p99Latency: 0,
+          breakingPoint: null,
+        },
+        bottlenecks: [],
+      };
+
+      for (let tierIndex = 0; tierIndex < tiers.length; tierIndex++) {
+        const tier = tiers[tierIndex];
+        setProgress(((tierIndex + 1) / tiers.length) * 100);
+
+        // Simulate concurrent requests for this tier
+        const tierResults = await simulateConcurrentRequests(fullUrl, tier);
+
+        const successes = tierResults.filter((r) => r.success);
+        const failures = tierResults.filter((r) => !r.success);
+        const latencies = successes.map((r) => r.time).sort((a, b) => a - b);
+
+        const tierStats = {
+          tier,
+          requestCount: tier,
+          successCount: successes.length,
+          errorCount: failures.length,
+          successRate: ((successes.length / tier) * 100).toFixed(1),
+          avgLatency: latencies.length > 0 ? Math.round(latencies.reduce((a, b) => a + b, 0) / latencies.length) : 0,
+          maxLatency: latencies.length > 0 ? Math.max(...latencies) : 0,
+          p99Latency: latencies.length > 0 ? latencies[Math.floor(latencies.length * 0.99)] || 0 : 0,
+        };
+
+        allResults.tiers.push(tierStats);
+        allResults.chartData.push({
+          tier: `${tier} users`,
+          avgLatency: tierStats.avgLatency,
+          p99Latency: tierStats.p99Latency,
+          errorRate: (failures.length / tier) * 100,
+          requests: tier,
+        });
+
+        allResults.overall.totalRequests += tier;
+        allResults.overall.successCount += successes.length;
+        allResults.overall.errorCount += failures.length;
+
+        // Detect breaking point (>10% error rate)
+        if (!allResults.overall.breakingPoint && failures.length / tier > 0.1) {
+          allResults.overall.breakingPoint = `${tier} concurrent users`;
+        }
+      }
+
+      // Calculate overall stats
+      const allLatencies = allResults.tiers
+        .flatMap((t) => Array(t.successCount).fill(t.avgLatency))
+        .sort((a, b) => a - b);
+
+      allResults.overall.avgLatency = Math.round(
+        allResults.tiers.reduce((sum, t) => sum + t.avgLatency * t.successCount, 0) /
+          allResults.overall.successCount
+      );
+      allResults.overall.maxLatency = Math.max(...allResults.tiers.map((t) => t.maxLatency));
+      allResults.overall.p99Latency = allLatencies[Math.floor(allLatencies.length * 0.99)] || 0;
+
+      // Detect bottlenecks based on architecture
+      const bottlenecks = detectBottlenecks(
+        allResults.tiers,
+        architecture,
+        deployUrl
+      );
+      allResults.bottlenecks = bottlenecks;
+
+      // Call AI for smart analysis
+      const aiAnalysis = await getAIBottleneckAnalysis(
+        architecture,
+        allResults,
+        deployUrl
+      );
+      allResults.aiAnalysis = aiAnalysis;
+
+      setResults(allResults);
+      chartDataRef.current = allResults.chartData;
+    } catch (err) {
+      setError(`Test failed: ${err.message}`);
+      console.error(err);
+    } finally {
+      setIsRunning(false);
+      setProgress(0);
+    }
+  };
+
+  // Local heuristic bottleneck detection
+  const detectBottlenecks = (tiers, architecture, url) => {
+    const bottlenecks = [];
+
+    // Analyze latency growth
+    for (let i = 1; i < tiers.length; i++) {
+      const prev = tiers[i - 1];
+      const curr = tiers[i];
+      const latencyGrowth = ((curr.avgLatency - prev.avgLatency) / prev.avgLatency) * 100;
+
+      if (latencyGrowth > 50) {
+        bottlenecks.push({
+          severity: 'high',
+          title: `High latency spike at ${curr.tier} users`,
+          description: `Latency jumped ${latencyGrowth.toFixed(0)}% from ${prev.tier} to ${curr.tier} users`,
+          advice: 'Consider caching, database optimization, or horizontal scaling',
+        });
+      }
+    }
+
+    // Error rate detection
+    const lastTier = tiers[tiers.length - 1];
+    if (lastTier.errorCount > lastTier.requestCount * 0.05) {
+      bottlenecks.push({
+        severity: 'critical',
+        title: 'High error rate under load',
+        description: `${lastTier.errorRate}% of requests failed at ${lastTier.tier} concurrent users`,
+        advice: 'Your endpoint is overloaded. Check rate limiting, connection pooling, and resource limits.',
+      });
+    }
+
+    // Slow endpoint detection
+    if (lastTier.avgLatency > 5000) {
+      bottlenecks.push({
+        severity: 'high',
+        title: 'Slow endpoint response time',
+        description: `Average response time is ${lastTier.avgLatency}ms at peak load`,
+        advice: 'Profile your code. Check for N+1 queries, slow AI API calls, or missing indexes.',
+      });
+    }
+
+    return bottlenecks;
+  };
+
+  // Call AI for intelligent bottleneck analysis
+  const getAIBottleneckAnalysis = async (architecture, results, deployUrl) => {
+    try {
+      const prompt = `
+You are a DevOps expert analyzing load test results. Given this architecture and load test data, provide 2-3 specific recommendations.
+
+Architecture: ${architecture}
+Deployment: ${deployUrl}
+
+Load Test Results:
+${results.tiers
+  .map(
+    (t) =>
+      `${t.tier} concurrent users: ${t.avgLatency}ms avg, ${t.p99Latency}ms p99, ${t.errorRate}% errors`
+  )
+  .join('\n')}
+
+Breaking point: ${results.overall.breakingPoint || 'None detected'}
+
+Provide a JSON response with this structure:
+{
+  "summary": "1 sentence summary of health",
+  "recommendations": [
+    { "priority": "critical|high|medium", "action": "specific action", "expectedImpact": "expected improvement" }
+  ],
+  "nextSteps": "what to do next"
+}
+`;
+
+      const response = await fetch('/api/claude', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt,
+          maxTokens: 1000,
+        }),
+      });
+
+      const data = await response.json();
+
+      try {
+        return JSON.parse(data.response);
+      } catch {
+        return {
+          summary: 'Load test completed. Review results above.',
+          recommendations: [],
+          nextSteps: 'Monitor production metrics and implement optimizations as needed.',
+        };
+      }
+    } catch (err) {
+      console.error('AI analysis failed:', err);
+      return null;
+    }
+  };
 
   return (
-    <div style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
-      <style>{`
-        @keyframes spin { to { transform: rotate(360deg) } }
-        @keyframes fadeIn { from { opacity:0; transform:translateY(6px) } to { opacity:1; transform:translateY(0) } }
-        .st-fade { animation: fadeIn 0.25s ease }
-      `}</style>
-
-      {/* Header */}
-      <div style={{ marginBottom: 20, display: "flex", alignItems: "center", gap: 14 }}>
-        <div style={{ width: 40, height: 40, borderRadius: 10, background: "rgba(234,179,8,0.08)", border: "1px solid rgba(234,179,8,0.18)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-          <FlaskConical size={18} color="#eab308" />
+    <div className="min-h-screen bg-black text-white p-8">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="mb-8 flex items-start gap-4">
+          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
+            <Zap className="w-6 h-6 text-yellow-500" />
+          </div>
+          <div>
+            <h1 className="text-4xl font-bold mb-2">Stress Tester</h1>
+            <p className="text-gray-400">
+              Test your deployed site with increasing concurrent load → Identify bottlenecks → Get AI recommendations
+            </p>
+          </div>
         </div>
-        <div>
-          <h1 style={{ fontSize: 20, fontWeight: 800, color: "rgba(255,255,255,0.85)", margin: 0, letterSpacing: "-0.02em" }}>Stress Tester</h1>
-          <p style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", margin: "3px 0 0", display: "flex", alignItems: "center", gap: 8 }}>
-            Describe your stack → Simulate 10 to 10K concurrent users → Find bottlenecks
-            <span style={{ display: "flex", alignItems: "center", gap: 4, color: "#eab308" }}>
-              <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#eab308", display: "inline-block" }} />
-              Simulated
-            </span>
-          </p>
+
+        {/* Warning Banner */}
+        <div className="mb-6 bg-yellow-500/5 border border-yellow-500/30 rounded-lg p-4 flex gap-3">
+          <AlertCircle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
+          <div className="text-sm text-yellow-200">
+            <strong>Real Endpoint Testing:</strong> We'll probe your live deployed URL with simulated concurrent requests.
+            Your endpoint will receive actual traffic. Use a staging URL if you prefer not to load-test production.
+          </div>
         </div>
-      </div>
 
-      {/* Disclaimer badge */}
-      <div style={{ background: "rgba(234,179,8,0.04)", border: "1px solid rgba(234,179,8,0.12)", borderRadius: 8, padding: "9px 14px", marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
-        <AlertTriangle size={12} color="rgba(234,179,8,0.6)" />
-        <span style={{ fontSize: 11, color: "rgba(234,179,8,0.6)" }}>AI-predicted · not real load testing — For production, pair with k6 or Artillery.</span>
-      </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Input Panel */}
+          <div className="lg:col-span-1">
+            <div className="bg-gray-900 border border-gray-800 rounded-lg p-6 space-y-6 sticky top-8">
+              <div>
+                <label className="block text-sm font-semibold mb-2">Deployment URL *</label>
+                <input
+                  type="text"
+                  placeholder="https://myapp.vercel.app"
+                  value={deployUrl}
+                  onChange={(e) => setDeployUrl(e.target.value)}
+                  disabled={isRunning}
+                  className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white placeholder-gray-500 disabled:opacity-50"
+                />
+                <p className="text-xs text-gray-500 mt-1">Include https://</p>
+              </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16, alignItems: "start" }}>
-        {/* Left — Input */}
-        <div>
-          {/* Editor card */}
-          <div style={{ background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, overflow: "hidden", marginBottom: 10 }}>
-            <div style={{ padding: "10px 14px", borderBottom: "1px solid rgba(255,255,255,0.05)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.25)" }}>Describe your architecture</span>
-              <button onClick={() => { setStack(SAMPLE_STACK); setResult(null) }}
-                style={{ background: "none", border: "none", cursor: "pointer", fontSize: 11, color: "#eab308", fontFamily: "inherit" }}>
-                Load Sample
+              <div>
+                <label className="block text-sm font-semibold mb-2">Endpoint Path</label>
+                <input
+                  type="text"
+                  placeholder="/"
+                  value={endpoint}
+                  onChange={(e) => setEndpoint(e.target.value)}
+                  disabled={isRunning}
+                  className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white placeholder-gray-500 disabled:opacity-50"
+                />
+                <p className="text-xs text-gray-500 mt-1">e.g., /api/analyze or /api/health</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold mb-2">HTTP Method</label>
+                <select
+                  value={httpMethod}
+                  onChange={(e) => setHttpMethod(e.target.value)}
+                  disabled={isRunning}
+                  className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white disabled:opacity-50"
+                >
+                  <option value="GET">GET</option>
+                  <option value="POST">POST</option>
+                  <option value="PUT">PUT</option>
+                </select>
+              </div>
+
+              {httpMethod !== 'GET' && (
+                <div>
+                  <label className="block text-sm font-semibold mb-2">Request Body (JSON)</label>
+                  <textarea
+                    placeholder='{"test": "data"}'
+                    value={requestBody}
+                    onChange={(e) => setRequestBody(e.target.value)}
+                    disabled={isRunning}
+                    rows={4}
+                    className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white placeholder-gray-500 text-xs disabled:opacity-50"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-semibold mb-2">
+                  Max Load to Test: {maxConcurrent} users
+                </label>
+                <input
+                  type="range"
+                  min="10"
+                  max="5000"
+                  step="100"
+                  value={maxConcurrent}
+                  onChange={(e) => setMaxConcurrent(parseInt(e.target.value))}
+                  disabled={isRunning}
+                  className="w-full disabled:opacity-50"
+                />
+                <p className="text-xs text-gray-500 mt-1">Tiers: 10, 100, 500, 1K, 5K</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold mb-2">Architecture Description</label>
+                <textarea
+                  placeholder="e.g., Vercel frontend + Supabase DB + Claude API calls on /api/analyze"
+                  value={architecture}
+                  onChange={(e) => setArchitecture(e.target.value)}
+                  disabled={isRunning}
+                  rows={4}
+                  className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white placeholder-gray-500 text-xs disabled:opacity-50"
+                />
+              </div>
+
+              <button
+                onClick={runStressTest}
+                disabled={isRunning}
+                className="w-full bg-yellow-500 hover:bg-yellow-600 disabled:bg-gray-700 text-black font-semibold py-3 rounded-lg transition flex items-center justify-center gap-2"
+              >
+                {isRunning ? (
+                  <>
+                    <Activity className="w-5 h-5 animate-spin" />
+                    Running... {Math.round(progress)}%
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-5 h-5" />
+                    Run Stress Test
+                  </>
+                )}
               </button>
+
+              {error && (
+                <div className="bg-red-500/10 border border-red-500/50 rounded p-3 text-red-200 text-sm">
+                  {error}
+                </div>
+              )}
             </div>
-            <textarea
-              value={stack}
-              onChange={e => setStack(e.target.value)}
-              placeholder={"Describe your full stack:\n- Frontend hosting\n- Backend / API\n- Database (type, tier, limits)\n- AI APIs used\n- Caching layer\n- CDN\n- Auth system"}
-              style={{
-                width: "100%", minHeight: 320, background: "transparent", border: "none", outline: "none",
-                resize: "vertical", color: "rgba(255,255,255,0.75)", fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-                fontSize: 12, lineHeight: 1.8, padding: "14px 16px",
-              }}
-            />
           </div>
 
-          {/* Run button */}
-          <button
-            onClick={runTest}
-            disabled={loading || !stack.trim()}
-            style={{
-              width: "100%", padding: "13px 20px", borderRadius: 9, border: "none",
-              background: loading || !stack.trim() ? "rgba(255,255,255,0.04)" : "#eab308",
-              color: loading || !stack.trim() ? "rgba(255,255,255,0.2)" : "#000",
-              fontSize: 13, fontWeight: 700, cursor: loading || !stack.trim() ? "not-allowed" : "pointer",
-              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-              transition: "all 0.15s", fontFamily: "inherit",
-            }}>
-            {loading
-              ? <><Loader2 size={15} style={{ animation: "spin 1s linear infinite" }} /> Simulating load...</>
-              : <><FlaskConical size={15} /> Run Stress Test</>
-            }
-          </button>
-        </div>
-
-        {/* Right — Results */}
-        <div>
-          {!loading && !result && (
-            <div style={{ background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "60px 32px", textAlign: "center", minHeight: 400, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-              <div style={{ width: 48, height: 48, borderRadius: 12, background: "rgba(234,179,8,0.07)", border: "1px solid rgba(234,179,8,0.15)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 18 }}>
-                <FlaskConical size={22} color="#eab308" />
+          {/* Results Panel */}
+          <div className="lg:col-span-2 space-y-6">
+            {!results && !isRunning && (
+              <div className="bg-gray-900 border border-gray-800 rounded-lg p-12 text-center">
+                <Zap className="w-16 h-16 text-gray-700 mx-auto mb-4" />
+                <p className="text-gray-400">Enter your URL and click "Run Stress Test" to begin</p>
               </div>
-              <h3 style={{ fontSize: 16, fontWeight: 700, color: "rgba(255,255,255,0.7)", margin: "0 0 8px" }}>Describe your stack</h3>
-              <p style={{ fontSize: 12, color: "rgba(255,255,255,0.25)", lineHeight: 1.7, maxWidth: 300, margin: 0 }}>Simulates 10 → 100 → 1K → 10K concurrent users and identifies which component breaks first.</p>
-            </div>
-          )}
+            )}
 
-          {loading && (
-            <div style={{ background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "80px 32px", textAlign: "center", minHeight: 400, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-              <Loader2 size={32} color="#eab308" style={{ animation: "spin 1.5s linear infinite", marginBottom: 18 }} />
-              <h3 style={{ fontSize: 14, fontWeight: 600, color: "rgba(255,255,255,0.6)", margin: "0 0 6px" }}>Simulating concurrent users</h3>
-              <p style={{ fontSize: 12, color: "rgba(255,255,255,0.2)", margin: 0 }}>10 → 100 → 1,000 → 10,000...</p>
-            </div>
-          )}
+            {isRunning && (
+              <div className="bg-gray-900 border border-gray-800 rounded-lg p-8 text-center">
+                <Activity className="w-12 h-12 text-yellow-500 mx-auto mb-4 animate-spin" />
+                <p className="text-lg font-semibold mb-2">Running stress test...</p>
+                <div className="w-full bg-gray-800 rounded-full h-2">
+                  <div
+                    className="bg-yellow-500 h-2 rounded-full transition-all"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+                <p className="text-gray-500 text-sm mt-2">{Math.round(progress)}% complete</p>
+              </div>
+            )}
 
-          {result && (
-            <div className="st-fade" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <ReportButton
-                scanType="stress-test"
-                title={`Stress test · ${result.tiers?.length ?? 0} tiers analyzed`}
-                resultData={result}
-              />
+            {results && (
+              <>
+                {/* Summary Stats */}
+                <div className="grid grid-cols-2 gap-4">
+                  <StatCard
+                    icon={<TrendingUp className="w-5 h-5" />}
+                    label="Peak Avg Latency"
+                    value={`${results.overall.avgLatency}ms`}
+                  />
+                  <StatCard
+                    icon={<Clock className="w-5 h-5" />}
+                    label="P99 Latency"
+                    value={`${results.overall.p99Latency}ms`}
+                  />
+                  <StatCard
+                    icon={<Activity className="w-5 h-5" />}
+                    label="Success Rate"
+                    value={`${((results.overall.successCount / results.overall.totalRequests) * 100).toFixed(1)}%`}
+                  />
+                  <StatCard
+                    icon={<AlertCircle className="w-5 h-5" />}
+                    label="Breaking Point"
+                    value={results.overall.breakingPoint || 'None detected'}
+                  />
+                </div>
 
-              {/* Tier cards */}
-              {result.tiers.map((tier, ti) => {
-                const tierColor = STATUS_COLOR[tier.status]
-                return (
-                  <div key={ti} style={{
-                    background: "#0a0a0a",
-                    border: "1px solid rgba(255,255,255,0.06)",
-                    borderLeft: `3px solid ${tierColor}`,
-                    borderRadius: 10,
-                    padding: "14px 16px",
-                  }}>
-                    {/* Tier header */}
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <Users size={14} color={tierColor} />
-                        <span style={{ fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,0.8)" }}>{tier.label}</span>
-                        <span style={{ fontSize: 10, color: "rgba(255,255,255,0.25)" }}>{TIERS[ti].desc}</span>
+                {/* Latency Chart */}
+                <div className="bg-gray-900 border border-gray-800 rounded-lg p-6">
+                  <h3 className="text-lg font-semibold mb-4">Latency & Error Rates</h3>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <AreaChart data={results.chartData}>
+                      <defs>
+                        <linearGradient id="colorLatency" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#eab308" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="#eab308" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                      <XAxis dataKey="tier" stroke="#666" />
+                      <YAxis stroke="#666" />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: '#1f2937',
+                          border: '1px solid #374151',
+                          borderRadius: '8px',
+                        }}
+                        formatter={(value) => [`${value.toFixed(0)}ms`, 'Latency']}
+                      />
+                      <Legend />
+                      <Area
+                        type="monotone"
+                        dataKey="avgLatency"
+                        stroke="#eab308"
+                        fillOpacity={1}
+                        fill="url(#colorLatency)"
+                        name="Avg Latency"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Tier Breakdown */}
+                <div className="bg-gray-900 border border-gray-800 rounded-lg p-6">
+                  <h3 className="text-lg font-semibold mb-4">Per-Tier Breakdown</h3>
+                  <div className="space-y-3">
+                    {results.tiers.map((tier, idx) => (
+                      <div key={idx} className="bg-gray-800 rounded p-4 flex items-center justify-between">
+                        <div>
+                          <p className="font-semibold">{tier.tier} concurrent users</p>
+                          <p className="text-sm text-gray-400">
+                            {tier.successCount}/{tier.requestCount} successful
+                            {tier.errorCount > 0 && ` • ${tier.errorRate}% error rate`}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-mono font-semibold">{tier.avgLatency}ms</p>
+                          <p className="text-sm text-gray-400">p99: {tier.p99Latency}ms</p>
+                        </div>
                       </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", display: "flex", alignItems: "center", gap: 4 }}>
-                          <Clock size={10} /> {tier.responseTime}
-                        </span>
-                        <span style={{
-                          fontSize: 9, fontWeight: 700, color: tierColor,
-                          background: `${tierColor}12`, border: `1px solid ${tierColor}25`,
-                          padding: "2px 7px", borderRadius: 4, letterSpacing: "0.07em",
-                        }}>{tier.label}</span>
-                      </div>
-                    </div>
+                    ))}
+                  </div>
+                </div>
 
-                    {/* Components */}
-                    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                      {tier.components.map((comp, ci) => (
-                        <div key={ci} style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 11 }}>
-                          <div style={{ width: 6, height: 6, borderRadius: "50%", background: STATUS_COLOR[comp.status], marginTop: 4, flexShrink: 0 }} />
-                          <span style={{ color: "rgba(255,255,255,0.5)", minWidth: 64, fontWeight: 600, flexShrink: 0 }}>{comp.name}</span>
-                          <span style={{ color: "rgba(255,255,255,0.3)", lineHeight: 1.5 }}>{comp.detail}</span>
+                {/* Bottleneck Detection */}
+                {results.bottlenecks.length > 0 && (
+                  <div className="bg-gray-900 border border-gray-800 rounded-lg p-6">
+                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                      <AlertCircle className="w-5 h-5 text-yellow-500" />
+                      Detected Bottlenecks
+                    </h3>
+                    <div className="space-y-3">
+                      {results.bottlenecks.map((bn, idx) => (
+                        <div
+                          key={idx}
+                          className={`rounded p-4 border ${
+                            bn.severity === 'critical'
+                              ? 'bg-red-500/10 border-red-500/30'
+                              : 'bg-yellow-500/10 border-yellow-500/30'
+                          }`}
+                        >
+                          <p className="font-semibold text-white">{bn.title}</p>
+                          <p className="text-sm text-gray-300 mt-1">{bn.description}</p>
+                          <p className="text-sm mt-2 text-green-300">💡 {bn.advice}</p>
                         </div>
                       ))}
                     </div>
+                  </div>
+                )}
 
-                    {/* Bottleneck */}
-                    {tier.bottleneck && (
-                      <div style={{ marginTop: 10, fontSize: 11, color: "#ef4444", display: "flex", alignItems: "center", gap: 6, background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.12)", padding: "6px 10px", borderRadius: 6 }}>
-                        <AlertTriangle size={11} /> Bottleneck: {tier.bottleneck}
+                {/* AI Analysis */}
+                {results.aiAnalysis && (
+                  <div className="bg-gray-900 border border-gray-800 rounded-lg p-6">
+                    <h3 className="text-lg font-semibold mb-4">AI Recommendations</h3>
+                    <p className="text-gray-300 mb-4">{results.aiAnalysis.summary}</p>
+                    {results.aiAnalysis.recommendations.length > 0 && (
+                      <div className="space-y-3 mb-4">
+                        {results.aiAnalysis.recommendations.map((rec, idx) => (
+                          <div key={idx} className="bg-gray-800 rounded p-3 text-sm">
+                            <p className="font-semibold text-white">
+                              [{rec.priority.toUpperCase()}] {rec.action}
+                            </p>
+                            <p className="text-gray-400 mt-1">Expected impact: {rec.expectedImpact}</p>
+                          </div>
+                        ))}
                       </div>
                     )}
+                    <p className="text-sm text-gray-400">Next steps: {results.aiAnalysis.nextSteps}</p>
                   </div>
-                )
-              })}
-
-              {/* Recommendations */}
-              <div style={{ background: "#0a0a0a", border: "1px solid rgba(52,211,153,0.12)", borderRadius: 10, padding: "16px 18px" }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: "#34d399", marginBottom: 12, letterSpacing: "0.1em" }}>SCALING RECOMMENDATIONS</div>
-                {result.recommendations.map((r, i) => (
-                  <div key={i} style={{ display: "flex", gap: 8, fontSize: 12, color: "rgba(255,255,255,0.4)", lineHeight: 1.6, marginBottom: 7 }}>
-                    <span style={{ color: "#34d399", flexShrink: 0 }}>→</span> {r}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+                )}
+              </>
+            )}
+          </div>
         </div>
       </div>
-
-      <NextSteps suggestions={suggestions} />
     </div>
-  )
-}
+  );
+};
+
+const StatCard = ({ icon, label, value }) => (
+  <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
+    <div className="flex items-center gap-3 mb-2">
+      <div className="text-yellow-500">{icon}</div>
+      <p className="text-sm text-gray-400">{label}</p>
+    </div>
+    <p className="text-2xl font-bold text-white">{value}</p>
+  </div>
+);
+
+export default StressTest;
