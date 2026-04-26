@@ -343,6 +343,7 @@ export default function Debugger() {
                 {/* File list */}
                 <div style={{ maxHeight:220, overflowY:"auto" }}>
                   {fileList.map(f => {
+                    console.log("FILE ITEM:", JSON.stringify(fileList[0]))
                     const checked = selectedFiles.includes(f.path)
                     return (
                       <label key={f.path} style={{ display:"flex", alignItems:"center", gap:10, padding:"7px 14px", cursor:"pointer", borderBottom:"1px solid rgba(255,255,255,0.03)", background: checked ? "rgba(52,211,153,0.03)" : "transparent", minWidth:0 }}>

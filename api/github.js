@@ -32,9 +32,45 @@ const MAX_FILES = 25
 const MAX_FILE_SIZE = 60000 // 60KB
 
 function parseGitHubUrl(url) {
-  const match = url.match(/github\.com\/([^/]+)\/([^/\s#?]+)/)
-  if (!match) return null
-  return { owner: match[1], repo: match[2].replace(/\.git$/, "") }
+  // Normalise — strip protocol, trailing slashes, whitespace
+  const cleaned = url.trim().replace(/^https?:\/\//, "").replace(/\/$/, "")
+
+  // Must start with github.com
+  if (!cleaned.startsWith("github.com/")) return null
+
+  const parts = cleaned.replace("github.com/", "").split("/")
+
+  // Need at least owner/repo
+  if (parts.length < 2) return null
+
+  const owner = parts[0]
+  const repo = parts[1].replace(/\.git$/, "")
+
+  // Default result
+  const result = { owner, repo, branch: null, subdir: null, singleFile: null }
+
+  // github.com/owner/repo/blob/branch/path/to/file.js → single file
+  if (parts[2] === "blob" && parts.length >= 5) {
+    result.branch = parts[3]
+    result.singleFile = parts.slice(4).join("/")
+    return result
+  }
+
+  // github.com/owner/repo/tree/branch/optional/subdir → branch + optional subdir
+  if (parts[2] === "tree" && parts.length >= 4) {
+    result.branch = parts[3]
+    if (parts.length > 4) result.subdir = parts.slice(4).join("/")
+    return result
+  }
+
+  // github.com/owner/repo/tree/branch (no subdir)
+  if (parts[2] === "tree" && parts.length === 4) {
+    result.branch = parts[3]
+    return result
+  }
+
+  // Anything else (issues, pulls, etc.) — just use owner/repo
+  return result
 }
 
 async function githubFetch(path, token) {
@@ -142,7 +178,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" })
   }
 
-  const { url } = req.body
+  const { url, mode, files: selectedFiles } = req.body
   if (!url || !url.trim()) {
     return res.status(400).json({ error: "No GitHub URL provided" })
   }
@@ -158,12 +194,34 @@ export default async function handler(req, res) {
     // Step 1: Get repo metadata
     const repoData = await githubFetch(`/repos/${parsed.owner}/${parsed.repo}`, token)
 
-    // Step 2: Get default branch
-    const defaultBranch = repoData.default_branch || "main"
+    // Step 2: Resolve branch
+    const branch = parsed.branch || repoData.default_branch || "main"
+
+    // Step 2b: singleFile mode — skip Trees API entirely
+    if (parsed.singleFile) {
+      const content = await fetchFileContent(parsed.singleFile, parsed.owner, parsed.repo, token)
+      if (!content) {
+        return res.status(404).json({ error: "Could not read the specified file." })
+      }
+      const combined = `// === ${parsed.singleFile} ===\n${content}`
+      return res.status(200).json({
+        repo: {
+          name: repoData.full_name,
+          description: repoData.description,
+          language: repoData.language,
+          stars: repoData.stargazers_count,
+          url: repoData.html_url,
+        },
+        files: [parsed.singleFile],
+        fileCount: 1,
+        totalLines: combined.split("\n").length,
+        code: combined,
+      })
+    }
 
     // Step 3: ONE call — full recursive file tree via Git Trees API
     const treeData = await githubFetch(
-      `/repos/${parsed.owner}/${parsed.repo}/git/trees/${defaultBranch}?recursive=1`,
+      `/repos/${parsed.owner}/${parsed.repo}/git/trees/${branch}?recursive=1`,
       token
     )
 
@@ -171,9 +229,10 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: "Repository appears to be empty." })
     }
 
-    // Step 4: Filter to scannable files
+    // Step 4: Filter to scannable files, applying subdir constraint if set
     const allFiles = treeData.tree
       .filter(shouldIncludeFile)
+      .filter((item) => !parsed.subdir || item.path.startsWith(parsed.subdir + "/") || item.path === parsed.subdir)
       .map((item) => ({ path: item.path, size: item.size }))
 
     if (allFiles.length === 0) {
@@ -183,9 +242,34 @@ export default async function handler(req, res) {
     // Step 5: Smart selection — spread across directories
     const selected = smartSelect(allFiles)
 
-    // Step 6: Fetch file contents (sequential to respect rate limits)
+    // If mode === "list", return file metadata objects for the picker UI
+    if (mode === "list") {
+      console.log("LIST MODE sample:", JSON.stringify(selected[0]))
+      return res.status(200).json({
+        repo: {
+          name: repoData.full_name,
+          description: repoData.description,
+          language: repoData.language,
+          stars: repoData.stargazers_count,
+          url: repoData.html_url,
+        },
+        files: selected.map((f, i) => ({
+          path: f.path,
+          size: f.size || 0,
+          autoSelected: i < 10,
+        })),
+        fileCount: selected.length,
+      })
+    }
+
+    // If specific files were requested, filter to only those
+    const filesToFetch = selectedFiles
+      ? selected.filter((f) => selectedFiles.includes(f.path))
+      : selected
+
+    // Step 6: Fetch file contents
     const files = []
-    for (const item of selected) {
+    for (const item of filesToFetch) {
       const content = await fetchFileContent(item.path, parsed.owner, parsed.repo, token)
       if (content) {
         files.push({ path: item.path, content })
@@ -196,7 +280,6 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: "Could not read any file contents from this repo." })
     }
 
-    // Step 7: Combine
     const combined = files
       .map((f) => `// === ${f.path} ===\n${f.content}`)
       .join("\n\n")

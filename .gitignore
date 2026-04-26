@@ -30,3 +30,4 @@ sprint-dashboard/build/
 backend/__pycache__/
 **/__pycache__/
 *.pyc
+.vercel
