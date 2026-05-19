@@ -7,16 +7,22 @@ export default function ProtectedRoute() {
   if (loading) {
     return (
       <div style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        height: "100vh",
-        background: "#0f1117",
-        color: "#94a3b8",
-        fontSize: "14px",
-        fontFamily: "monospace"
+        display: "flex", flexDirection: "column",
+        alignItems: "center", justifyContent: "center",
+        height: "100vh", background: "#050505", gap: 14,
+        fontFamily: "'Inter', system-ui, sans-serif",
       }}>
-        Checking auth...
+        <style>{`@keyframes _spin{to{transform:rotate(360deg)}}`}</style>
+        <div style={{
+          width: 36, height: 36,
+          border: "2px solid rgba(52,211,153,0.1)",
+          borderTopColor: "#34d399",
+          borderRadius: "50%",
+          animation: "_spin 0.9s linear infinite",
+        }} />
+        <span style={{ fontSize: 12, color: "rgba(255,255,255,0.2)", letterSpacing: "0.08em" }}>
+          LOADING
+        </span>
       </div>
     )
   }
